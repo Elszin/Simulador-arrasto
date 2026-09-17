@@ -10,9 +10,16 @@ st.set_page_config(
     layout="wide"  # Layout amplo essencial para o formato de 3 colunas
 )
 
-# Estilização CSS
+# Estilização CSS com painel central fixo (position: sticky)
 st.markdown("""
     <style>
+    /* Congela a coluna central (gráfico e métricas) no topo da tela */
+    div[data-testid="stHorizontalBlock"] > div:nth-child(1) {
+        position: sticky;
+        top: 2rem;
+        align-self: flex-start;
+    }
+    
     .main-title {
         font-size: 2.2rem;
         font-weight: 900;
@@ -21,6 +28,7 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         margin-bottom: 0px;
     }
+    
     .variable-card {
         background-color: #F8FAFC;
         border-left: 4px solid #00D2FF;
