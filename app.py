@@ -40,10 +40,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Dicionário de Fluidos (Mecânica dos Fluidos)
+# Dicionário de Fluidos Base
 FLUIDOS = {
-    "Ar (Nível do Mar - 15°C)": 1.225,
-    "Ar (Altitude 2000m)": 1.006,
+    "Ar Atmosférico (Variável com Altitude)": 1.225,
     "Água Doce (20°C)": 998.2,
     "Água do Mar (15°C)": 1025.0,
     "Customizado": 1.225
@@ -64,8 +63,17 @@ PRESETS_AGUA = {
     "Customizado": {"cd": 0.10, "area": 1.0},
     "Submarino / Torpedo": {"cd": 0.04, "area": 1.5},
     "Casco de Lancha / Barco": {"cd": 0.25, "area": 2.5},
-    "Nandador / Mergulhador": {"cd": 0.70, "area": 0.5},
+    "Nadador / Mergulhador": {"cd": 0.70, "area": 0.5},
     "Esfera Perfeita debaixo d'água": {"cd": 0.47, "area": 1.0}
+}
+
+# Presets Rápido de Cidades (Altitude em metros)
+CIDADES_ALTITUDE = {
+    "Personalizado": None,
+    "Nível do Mar (0 m)": 0,
+    "São Paulo / Curitiba (~800 m)": 800,
+    "Cidade do México (~2240 m)": 2240,
+    "La Paz - Bolívia (~3640 m)": 3640
 }
 
 # ==========================================
@@ -77,8 +85,25 @@ with st.sidebar:
     
     st.markdown("**🌊 Meio Fluido & Ambiente**")
     fluido_selecionado = st.selectbox("Selecione o Fluido:", list(FLUIDOS.keys()), index=0)
-    rho_padrao = FLUIDOS[fluido_selecionado]
     
+    is_ar = "Ar" in fluido_selecionado
+    is_agua = "Água" in fluido_selecionado
+
+    # Módulo de Altitude (Ativo apenas para o Ar)
+    if is_ar:
+        st.markdown("**🏔️ Simulador de Altitude**")
+        cidade_preset = st.selectbox("Presets de Altitude:", list(CIDADES_ALTITUDE.keys()), index=1)
+        
+        val_altitude = CIDADES_ALTITUDE[cidade_preset] if CIDADES_ALTITUDE[cidade_preset] is not None else 0
+        altitude = st.slider("Altitude em relação ao nível do mar (m)", 0, 5000, val_altitude, 100)
+        
+        # Fórmula Barométrica Simplificada: ρ(h) = ρ0 * e^(-h / 8500)
+        rho_calculado = 1.225 * np.exp(-altitude / 8500)
+        st.caption(f"💡 Densidade do ar calculada: **{rho_calculado:.3f} kg/m³**")
+        rho_padrao = rho_calculado
+    else:
+        rho_padrao = FLUIDOS[fluido_selecionado]
+
     rho = st.slider("Densidade do meio ρ (kg/m³)", 0.1, 1100.0, float(rho_padrao), 0.1)
     v_kmh = st.slider("Velocidade do Corpo (km/h)", 0.0, 180.0, 108.0, 1.0)
     v_vento_kmh = st.slider("Vento / Correnteza (-Favor / +Contra km/h)", -50.0, 50.0, 0.0, 1.0)
@@ -90,8 +115,7 @@ with st.sidebar:
     comparar = st.toggle("🔀 Ativar Modo Comparativo", value=False)
     st.write("---")
 
-# Seleção automática do conjunto de presets coerente com o fluido
-is_agua = "Água" in fluido_selecionado
+# Seleção de Presets coerentes
 presets_ativos = PRESETS_AGUA if is_agua else PRESETS_AR
 
 # DIVISÃO DA ÁREA PRINCIPAL
@@ -126,7 +150,7 @@ with col_direita:
 
     with st.expander("📖 Teoria das Variáveis", expanded=False):
         st.markdown("""
-        <div class="variable-card"><b>ρ:</b> Densidade do meio (Ar ≈ 1.22 kg/m³ | Água ≈ 1000 kg/m³).</div>
+        <div class="variable-card"><b>ρ:</b> Densidade do meio (Calculada dinamicamente via altitude).</div>
         <div class="variable-card"><b>v<sub>efetiva</sub>:</b> Velocidade do corpo + fluxo do fluido.</div>
         <div class="variable-card"><b>C<sub>d</sub>:</b> Eficiência do formato geométrico.</div>
         <div class="variable-card"><b>A:</b> Área frontal projetada.</div>
