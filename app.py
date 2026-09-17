@@ -5,15 +5,14 @@ import pandas as pd
 
 # 1. Configuração da Página
 st.set_page_config(
-    page_title="Dashboard de Arrasto Aerodinâmico",
+    page_title="Dashboard de Arrasto Aerodinâmico & Hidrodinâmico",
     page_icon="⚡",
     layout="wide"
 )
 
-# Estilização CSS com Coluna Fixa (Sticky) e Ajustes Visuais
+# Estilização CSS com Coluna Fixa (Sticky)
 st.markdown("""
     <style>
-    /* Trava a Coluna Central (Gráfico e Métricas) no topo ao rolar */
     div[data-testid="stColumn"]:nth-child(1) {
         position: sticky;
         top: 1rem;
@@ -41,6 +40,15 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Dicionário de Fluidos (Mecânica dos Fluidos)
+FLUIDOS = {
+    "Ar (Nível do Mar - 15°C)": 1.225,
+    "Ar (Altitude 2000m)": 1.006,
+    "Água Doce (20°C)": 998.2,
+    "Água do Mar (15°C)": 1025.0,
+    "Customizado": 1.225
+}
+
 # Banco de dados de Presets
 PRESETS = {
     "Customizado": {"cd": 0.30, "area": 2.2},
@@ -58,10 +66,13 @@ with st.sidebar:
     st.markdown("### ⚙️ Configurações Gerais")
     st.write("---")
     
-    st.markdown("**🌍 Condições do Ambiente**")
-    rho = st.slider("Densidade do ar ρ (kg/m³)", 0.5, 2.0, 1.225, 0.05)
+    st.markdown("**🌊 Meio Fluido & Ambiente**")
+    fluido_selecionado = st.selectbox("Selecione o Fluido:", list(FLUIDOS.keys()), index=0)
+    rho_padrao = FLUIDOS[fluido_selecionado]
+    
+    rho = st.slider("Densidade do meio ρ (kg/m³)", 0.1, 1100.0, float(rho_padrao), 0.1)
     v_kmh = st.slider("Velocidade do Veículo (km/h)", 0.0, 180.0, 108.0, 1.0)
-    v_vento_kmh = st.slider("Vento (-Favor / +Contra km/h)", -50.0, 50.0, 0.0, 1.0)
+    v_vento_kmh = st.slider("Vento / Correnteza (-Favor / +Contra km/h)", -50.0, 50.0, 0.0, 1.0)
     
     v_efetiva_kmh = max(0.0, v_kmh + v_vento_kmh)
     v_efetiva_ms = v_efetiva_kmh / 3.6
@@ -102,8 +113,8 @@ with col_direita:
 
     with st.expander("📖 Teoria das Variáveis", expanded=False):
         st.markdown("""
-        <div class="variable-card"><b>ρ:</b> Densidade do meio (ar = 1.225 kg/m³).</div>
-        <div class="variable-card"><b>v<sub>efetiva</sub>:</b> Velocidade do veículo + vento.</div>
+        <div class="variable-card"><b>ρ:</b> Densidade do meio (Ar ≈ 1.22 kg/m³ | Água ≈ 1000 kg/m³).</div>
+        <div class="variable-card"><b>v<sub>efetiva</sub>:</b> Velocidade do corpo + fluxo do fluido.</div>
         <div class="variable-card"><b>C<sub>d</sub>:</b> Eficiência do formato geométrico.</div>
         <div class="variable-card"><b>A:</b> Área frontal projetada.</div>
         """, unsafe_allow_html=True)
@@ -134,7 +145,7 @@ with col_centro:
 
     fig = go.Figure()
     
-    # Curva A + Área preenchida
+    # Curva A
     fig.add_trace(go.Scatter(
         x=v_vetor_kmh, y=fd_vetor_a, mode='lines', name='Objeto A',
         line=dict(color='#00D2FF', width=3),
@@ -145,13 +156,12 @@ with col_centro:
         x=[v_kmh], y=[fd_a], mode='markers', name='Ponto A',
         marker=dict(color='#00D2FF', size=10, line=dict(color='#FFFFFF', width=2))
     ))
-    # Linha pontilhada de projeção A
     fig.add_trace(go.Scatter(
         x=[0, v_kmh, v_kmh], y=[fd_a, fd_a, 0], mode='lines',
         line=dict(color='#00D2FF', width=1, dash='dash'), hoverinfo='skip'
     ))
 
-    # Curva B + Área preenchida
+    # Curva B
     if comparar:
         fd_vetor_b = 0.5 * rho * (v_vetor_efetiva_ms ** 2) * cd_b * area_b
         fig.add_trace(go.Scatter(
@@ -164,17 +174,15 @@ with col_centro:
             x=[v_kmh], y=[fd_b], mode='markers', name='Ponto B',
             marker=dict(color='#FF2A6D', size=10, line=dict(color='#FFFFFF', width=2))
         ))
-        # Linha pontilhada de projeção B
         fig.add_trace(go.Scatter(
             x=[0, v_kmh, v_kmh], y=[fd_b, fd_b, 0], mode='lines',
             line=dict(color='#FF2A6D', width=1, dash='dash'), hoverinfo='skip'
         ))
 
-    max_y = max(5000, fd_a * 1.2 if not comparar else max(fd_a, fd_b) * 1.2)
+    max_y = max(5000 if rho < 10 else 1000000, fd_a * 1.2 if not comparar else max(fd_a, fd_b) * 1.2)
     
-    # Restauração das linhas sólidas nos eixos X e Y
     fig.update_layout(
-        xaxis_title="Velocidade do Veículo (km/h)",
+        xaxis_title="Velocidade do Corpo (km/h)",
         yaxis_title="Força de Arrasto (N)",
         template="plotly_white",
         height=430,
@@ -191,7 +199,8 @@ with col_centro:
 with st.sidebar:
     st.markdown("**📂 Exportação de Dados**")
     data_dict = {
-        "Velocidade_Veiculo_kmh": v_vetor_kmh,
+        "Fluido": [fluido_selecionado] * 100,
+        "Velocidade_Corpo_kmh": v_vetor_kmh,
         "Velocidade_Efetiva_kmh": v_vetor_efetiva_kmh,
         "Forca_Objeto_A_N": fd_vetor_a
     }
