@@ -3,21 +3,22 @@ import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
 
-# 1. Configuração da Página - Layout Wide para ocupar a tela inteira
+# 1. Configuração da Página
 st.set_page_config(
     page_title="Dashboard de Arrasto Aerodinâmico",
     page_icon="⚡",
-    layout="wide"  # Layout amplo essencial para o formato de 3 colunas
+    layout="wide"
 )
 
-# Estilização CSS com painel central fixo (position: sticky)
+# Estilização CSS com Coluna Fixa (Sticky) e Ajustes Visuais
 st.markdown("""
     <style>
-    /* Congela a coluna central (gráfico e métricas) no topo da tela */
-    div[data-testid="stHorizontalBlock"] > div:nth-child(1) {
+    /* Trava a Coluna Central (Gráfico e Métricas) no topo ao rolar */
+    div[data-testid="stColumn"]:nth-child(1) {
         position: sticky;
-        top: 2rem;
+        top: 1rem;
         align-self: flex-start;
+        z-index: 99;
     }
     
     .main-title {
@@ -51,7 +52,7 @@ PRESETS = {
 }
 
 # ==========================================
-# COLUNA 1 (ESQUERDA): BARRA LATERAL / CONFIGS
+# COLUNA 1 (ESQUERDA): BARRA LATERAL
 # ==========================================
 with st.sidebar:
     st.markdown("### ⚙️ Configurações Gerais")
@@ -67,15 +68,13 @@ with st.sidebar:
 
     st.write("---")
     comparar = st.toggle("🔀 Ativar Modo Comparativo", value=False)
-    
     st.write("---")
-    st.markdown("**📂 Exportação de Dados**")
 
-# DIVISÃO DA ÁREA PRINCIPAL EM 2 COLUNAS (MEIO E DIREITA)
+# DIVISÃO DA ÁREA PRINCIPAL
 col_centro, col_direita = st.columns([2.2, 1], gap="medium")
 
 # ==========================================
-# COLUNA 3 (DIREITA): OBJETOS & PARÂMETROS
+# COLUNA 3 (DIREITA): PARÂMETROS
 # ==========================================
 with col_direita:
     st.markdown("### 📐 Parâmetros do Objeto")
@@ -101,7 +100,6 @@ with col_direita:
 
         fd_b = 0.5 * rho * (v_efetiva_ms ** 2) * cd_b * area_b
 
-    # Explicação didática compacta
     with st.expander("📖 Teoria das Variáveis", expanded=False):
         st.markdown("""
         <div class="variable-card"><b>ρ:</b> Densidade do meio (ar = 1.225 kg/m³).</div>
@@ -111,13 +109,12 @@ with col_direita:
         """, unsafe_allow_html=True)
 
 # ==========================================
-# COLUNA 2 (MEIO): RESULTADOS & GRÁFICO
+# COLUNA 2 (MEIO): GRÁFICO E RESULTADOS
 # ==========================================
 with col_centro:
     st.markdown('<p class="main-title">⚡ Simulador de Força de Arrasto</p>', unsafe_allow_html=True)
     st.latex(r"F_d = \frac{1}{2} \rho (v_{veículo} + v_{vento})^2 C_d A")
     
-    # Métricas de Resultado no topo do painel central
     if comparar:
         m_col1, m_col2, m_col3 = st.columns(3)
         m_col1.metric("Força (Objeto A)", f"{fd_a:.1f} N")
@@ -129,7 +126,7 @@ with col_centro:
         m_col1.metric("Força de Arrasto (Fd)", f"{fd_a:.2f} N")
         m_col2.metric("Velocidade Efetiva", f"{v_efetiva_kmh:.0f} km/h", f"{v_efetiva_ms:.1f} m/s")
 
-    # Construção do Gráfico Plotly
+    # Vetor de Dados
     v_vetor_kmh = np.linspace(0, 180, 100)
     v_vetor_efetiva_kmh = np.maximum(0.0, v_vetor_kmh + v_vento_kmh)
     v_vetor_efetiva_ms = v_vetor_efetiva_kmh / 3.6
@@ -137,34 +134,62 @@ with col_centro:
 
     fig = go.Figure()
     
-    # Curva A
+    # Curva A + Área preenchida
     fig.add_trace(go.Scatter(
         x=v_vetor_kmh, y=fd_vetor_a, mode='lines', name='Objeto A',
         line=dict(color='#00D2FF', width=3),
-        fill='tozeroy' if not comparar else None, fillcolor='rgba(0, 210, 255, 0.08)'
+        fill='tozeroy', fillcolor='rgba(0, 210, 255, 0.08)',
+        hovertemplate='<b>Objeto A</b><br>v: %{x:.1f} km/h<br>Fd: %{y:.2f} N<extra></extra>'
     ))
-    fig.add_trace(go.Scatter(x=[v_kmh], y=[fd_a], mode='markers', name='Ponto A', marker=dict(color='#00D2FF', size=10)))
+    fig.add_trace(go.Scatter(
+        x=[v_kmh], y=[fd_a], mode='markers', name='Ponto A',
+        marker=dict(color='#00D2FF', size=10, line=dict(color='#FFFFFF', width=2))
+    ))
+    # Linha pontilhada de projeção A
+    fig.add_trace(go.Scatter(
+        x=[0, v_kmh, v_kmh], y=[fd_a, fd_a, 0], mode='lines',
+        line=dict(color='#00D2FF', width=1, dash='dash'), hoverinfo='skip'
+    ))
 
-    # Curva B (se ativo)
+    # Curva B + Área preenchida
     if comparar:
         fd_vetor_b = 0.5 * rho * (v_vetor_efetiva_ms ** 2) * cd_b * area_b
         fig.add_trace(go.Scatter(
             x=v_vetor_kmh, y=fd_vetor_b, mode='lines', name='Objeto B',
-            line=dict(color='#FF2A6D', width=3)
+            line=dict(color='#FF2A6D', width=3),
+            fill='tozeroy', fillcolor='rgba(255, 42, 109, 0.05)',
+            hovertemplate='<b>Objeto B</b><br>v: %{x:.1f} km/h<br>Fd: %{y:.2f} N<extra></extra>'
         ))
-        fig.add_trace(go.Scatter(x=[v_kmh], y=[fd_b], mode='markers', name='Ponto B', marker=dict(color='#FF2A6D', size=10)))
+        fig.add_trace(go.Scatter(
+            x=[v_kmh], y=[fd_b], mode='markers', name='Ponto B',
+            marker=dict(color='#FF2A6D', size=10, line=dict(color='#FFFFFF', width=2))
+        ))
+        # Linha pontilhada de projeção B
+        fig.add_trace(go.Scatter(
+            x=[0, v_kmh, v_kmh], y=[fd_b, fd_b, 0], mode='lines',
+            line=dict(color='#FF2A6D', width=1, dash='dash'), hoverinfo='skip'
+        ))
 
     max_y = max(5000, fd_a * 1.2 if not comparar else max(fd_a, fd_b) * 1.2)
+    
+    # Restauração das linhas sólidas nos eixos X e Y
     fig.update_layout(
-        xaxis_title="Velocidade do Veículo (km/h)", yaxis_title="Força de Arrasto (N)",
-        template="plotly_white", height=450, margin=dict(l=10, r=10, t=20, b=10),
-        yaxis=dict(range=[0, max_y]), showlegend=comparar
+        xaxis_title="Velocidade do Veículo (km/h)",
+        yaxis_title="Força de Arrasto (N)",
+        template="plotly_white",
+        height=430,
+        margin=dict(l=10, r=10, t=20, b=10),
+        showlegend=comparar,
+        legend=dict(x=0.02, y=0.98),
+        yaxis=dict(range=[0, max_y], gridcolor='#E5E5E5', showline=True, linewidth=1.5, linecolor='#444444', zeroline=False),
+        xaxis=dict(gridcolor='#E5E5E5', showline=True, linewidth=1.5, linecolor='#444444', zeroline=False)
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
-# Adiciona o botão de download dentro da Sidebar na Coluna da Esquerda
+# Exportador na Sidebar
 with st.sidebar:
+    st.markdown("**📂 Exportação de Dados**")
     data_dict = {
         "Velocidade_Veiculo_kmh": v_vetor_kmh,
         "Velocidade_Efetiva_kmh": v_vetor_efetiva_kmh,
