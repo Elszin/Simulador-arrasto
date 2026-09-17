@@ -259,7 +259,7 @@ def run_rocket_simulation(cd_base, area, v_max_kmh, max_altitude_km):
     
     # Integração Numérica do Trabalho do Arrasto (Energia Perdida em Gigajoules)
     # W = ∫ F_d dh
-    trabalho_joules = np.trapz(df["Forca_Arrasto_N"], df["Altitude_m"])
+    trabalho_joules = np.trapezoid(df["Forca_Arrasto_N"], df["Altitude_m"])
     trabalho_gj = trabalho_joules / 1e9
     
     return df, row_max_q, trabalho_gj
