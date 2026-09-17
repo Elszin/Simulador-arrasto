@@ -79,26 +79,26 @@ fig.update_layout(
     margin=dict(l=20, r=20, t=30, b=20),
     height=400,
     showlegend=False,
-    # Configuração do Eixo Y
+    # Eixo Y com linha vermelha
     yaxis=dict(
         range=[0, 4000],
-        gridcolor='#2A2A2A',        # Grade suave de fundo
-        showline=True,              # Exibe a linha do eixo Y
-        linewidth=2.5,              # Espessura da linha do eixo
-        linecolor='#FFFFFF',        # Cor branca/clara para destacar o eixo Y
+        gridcolor='#2A2A2A',
+        showline=True,
+        linewidth=3,
+        linecolor='#FF2A6D',
         zeroline=True,
-        zerolinewidth=2.5,
-        zerolinecolor='#FFFFFF'
+        zerolinewidth=3,
+        zerolinecolor='#FF2A6D'
     ),
-    # Configuração do Eixo X
+    # Eixo X com linha vermelha
     xaxis=dict(
-        gridcolor='#2A2A2A',        # Grade suave de fundo
-        showline=True,              # Exibe a linha do eixo X
-        linewidth=2.5,              # Espessura da linha do eixo
-        linecolor='#FFFFFF',        # Cor branca/clara para destacar o eixo X
+        gridcolor='#2A2A2A',
+        showline=True,
+        linewidth=3,
+        linecolor='#FF2A6D',
         zeroline=True,
-        zerolinewidth=2.5,
-        zerolinecolor='#FFFFFF'
+        zerolinewidth=3,
+        zerolinecolor='#FF2A6D'
     )
 )
 
