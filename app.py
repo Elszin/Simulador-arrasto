@@ -76,11 +76,30 @@ fig.update_layout(
     xaxis_title="Velocidade (km/h)",
     yaxis_title="Força de Arrasto (N)",
     template="plotly_dark",
-    margin=dict(l=20, r=20, t=20, b=20),
+    margin=dict(l=20, r=20, t=30, b=20),
     height=400,
     showlegend=False,
-    yaxis=dict(range=[0, 4000], gridcolor='#333333'),
-    xaxis=dict(gridcolor='#333333')
+    # Configuração do Eixo Y
+    yaxis=dict(
+        range=[0, 4000],
+        gridcolor='#2A2A2A',        # Grade suave de fundo
+        showline=True,              # Exibe a linha do eixo Y
+        linewidth=2.5,              # Espessura da linha do eixo
+        linecolor='#FFFFFF',        # Cor branca/clara para destacar o eixo Y
+        zeroline=True,
+        zerolinewidth=2.5,
+        zerolinecolor='#FFFFFF'
+    ),
+    # Configuração do Eixo X
+    xaxis=dict(
+        gridcolor='#2A2A2A',        # Grade suave de fundo
+        showline=True,              # Exibe a linha do eixo X
+        linewidth=2.5,              # Espessura da linha do eixo
+        linecolor='#FFFFFF',        # Cor branca/clara para destacar o eixo X
+        zeroline=True,
+        zerolinewidth=2.5,
+        zerolinecolor='#FFFFFF'
+    )
 )
 
 st.plotly_chart(fig, use_container_width=True)
