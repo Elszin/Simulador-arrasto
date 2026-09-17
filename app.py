@@ -9,21 +9,31 @@ st.set_page_config(
     layout="centered"
 )
 
-# Estilização CSS personalizada para títulos e caixas
+# Estilização CSS personalizada
 st.markdown("""
     <style>
     .main-title {
-        font-size: 2.2rem;
-        font-weight: 800;
+        font-size: 2.8rem;
+        font-weight: 900;
         background: -webkit-linear-gradient(45deg, #00D2FF, #FF2A6D);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        margin-bottom: 0px;
+        margin-bottom: 5px;
+        line-height: 1.2;
     }
     .sub-title {
-        color: #666;
-        font-size: 1rem;
-        margin-bottom: 20px;
+        color: #4A5568;
+        font-size: 1.15rem;
+        line-height: 1.6;
+        margin-bottom: 15px;
+    }
+    .variable-card {
+        background-color: #F8FAFC;
+        border-left: 4px solid #00D2FF;
+        padding: 10px 14px;
+        margin-bottom: 8px;
+        border-radius: 4px;
+        font-size: 0.92rem;
     }
     .stMetric {
         background-color: #f8f9fa;
@@ -34,11 +44,31 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Cabeçalho Estilizado
+# 1. Título em Escala Maior
 st.markdown('<p class="main-title">⚡ Simulador de Força de Arrasto</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">Análise interativa de mecânica dos fluidos em tempo real</p>', unsafe_allow_html=True)
 
+# 2. Descrição Elaborada e Explicativa
+st.markdown(
+    '<p class="sub-title">'
+    'Ferramenta interativa desenvolvida para modelagem e análise da resistência aerodinâmica em meios fluidos. '
+    'O simulador permite visualizar como a variação dos parâmetros físicos altera dinamicamente a força de oposição ao movimento.'
+    '</p>',
+    unsafe_allow_html=True
+)
+
+# Exibição da Equação
 st.latex(r"F_d = \frac{1}{2} \rho v^2 C_d A")
+
+# Explicação Detalhada das Variáveis
+with st.expander("📖 Entenda as Variáveis da Fórmula", expanded=False):
+    st.markdown("""
+    <div class="variable-card"><b>ρ (Densidade do Fluido):</b> Mede a massa específica do meio (ex: ar = 1.225 kg/m³). Quanto mais denso o fluido, maior a quantidade de matéria a ser deslocada.</div>
+    <div class="variable-card"><b>v (Velocidade):</b> Parâmetro de maior impacto devido à relação quadrática (v²). Dobrar a velocidade multiplica a força de arrasto por quatro.</div>
+    <div class="variable-card"><b>C<sub>d</sub> (Coeficiente de Arrasto):</b> Adimensional que quantifica a eficiência aerodinâmica. Depende estritamente do formato e geometria do corpo.</div>
+    <div class="variable-card"><b>A (Área Frontal):</b> Projeção da área do objeto perpendicular à direção do fluxo. Quanto maior a área exposta, maior a resistência sofrida.</div>
+    """, unsafe_allow_html=True)
+
+st.write("")
 
 # Container de Controles
 with st.container(border=True):
@@ -57,12 +87,12 @@ with st.container(border=True):
 v_ms = v_kmh / 3.6
 fd_atual = 0.5 * rho * (v_ms ** 2) * cd * area
 
-st.write("") # Espaçamento
+st.write("")
 
 # Métricas Destacadas em Colunas
 m_col1, m_col2 = st.columns(2)
 m_col1.metric("Força de Arrasto (Fd)", f"{fd_atual:.2f} N")
-m_col2.metric("Velocidade Converter", f"{v_ms:.1f} m/s", f"{v_kmh:.0f} km/h")
+m_col2.metric("Velocidade (v)", f"{v_ms:.1f} m/s", f"{v_kmh:.0f} km/h")
 
 st.write("")
 
@@ -80,7 +110,8 @@ fig.add_trace(go.Scatter(
     name='Curva Fd',
     line=dict(color='#00D2FF', width=3),
     fill='tozeroy',
-    fillcolor='rgba(0, 210, 255, 0.08)'
+    fillcolor='rgba(0, 210, 255, 0.08)',
+    hovertemplate='<b>Velocidade:</b> %{x:.1f} km/h<br><b>Força (Fd):</b> %{y:.2f} N<extra></extra>'
 ))
 
 fig.add_trace(go.Scatter(
@@ -95,7 +126,8 @@ fig.add_trace(go.Scatter(
     x=[v_kmh], y=[fd_atual],
     mode='markers',
     name='Ponto Atual',
-    marker=dict(color='#FF2A6D', size=11, line=dict(color='#FFFFFF', width=2))
+    marker=dict(color='#FF2A6D', size=11, line=dict(color='#FFFFFF', width=2)),
+    hovertemplate='<b>Ponto Atual</b><br>v: %{x:.1f} km/h<br>Fd: %{y:.2f} N<extra></extra>'
 ))
 
 fig.update_layout(
