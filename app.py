@@ -70,7 +70,7 @@ st.write("")
 # Banco de dados de Presets
 PRESETS = {
     "Customizado": {"cd": 0.30, "area": 2.2},
-    "Carro Popular (Hatch/Sede)": {"cd": 0.32, "area": 2.2},
+    "Carro Popular (Hatch/Sedan)": {"cd": 0.32, "area": 2.2},
     "Carro Esportivo (Supercarro)": {"cd": 0.28, "area": 1.9},
     "Caminhão / Ônibus": {"cd": 0.80, "area": 8.0},
     "Ciclista em Pé (Gravel/Urbano)": {"cd": 0.90, "area": 0.6},
@@ -94,13 +94,16 @@ st.write("")
 # --- OBJETO A ---
 with st.container(border=True):
     st.markdown("**🔵 Objeto A (Referência)**")
-    preset_a = st.selectbox("Selecione um Preset para o Objeto A:", list(PRESETS.keys()), index=1)
+    preset_a = st.selectbox("Selecione um Preset para o Objeto A:", list(PRESETS.keys()), index=1, key="select_preset_a")
+    
+    default_cd_a = PRESETS[preset_a]["cd"]
+    default_area_a = PRESETS[preset_a]["area"]
     
     col_a1, col_a2 = st.columns(2)
     with col_a1:
-        cd_a = st.slider("Cd (Objeto A)", 0.1, 1.5, PRESETS[preset_a]["cd"], 0.01, key="cd_a")
+        cd_a = st.slider("Cd (Objeto A)", 0.1, 1.5, default_cd_a, 0.01, key=f"cd_a_{preset_a}")
     with col_a2:
-        area_a = st.slider("Área Frontal A (m²)", 0.1, 10.0, PRESETS[preset_a]["area"], 0.1, key="area_a")
+        area_a = st.slider("Área Frontal A (m²)", 0.1, 10.0, default_area_a, 0.1, key=f"area_a_{preset_a}")
 
 fd_a = 0.5 * rho * (v_ms ** 2) * cd_a * area_a
 
@@ -108,13 +111,16 @@ fd_a = 0.5 * rho * (v_ms ** 2) * cd_a * area_a
 if comparar:
     with st.container(border=True):
         st.markdown("**🔴 Objeto B (Comparativo)**")
-        preset_b = st.selectbox("Selecione um Preset para o Objeto B:", list(PRESETS.keys()), index=3)
+        preset_b = st.selectbox("Selecione um Preset para o Objeto B:", list(PRESETS.keys()), index=3, key="select_preset_b")
+        
+        default_cd_b = PRESETS[preset_b]["cd"]
+        default_area_b = PRESETS[preset_b]["area"]
         
         col_b1, col_b2 = st.columns(2)
         with col_b1:
-            cd_b = st.slider("Cd (Objeto B)", 0.1, 1.5, PRESETS[preset_b]["cd"], 0.01, key="cd_b")
+            cd_b = st.slider("Cd (Objeto B)", 0.1, 1.5, default_cd_b, 0.01, key=f"cd_b_{preset_b}")
         with col_b2:
-            area_b = st.slider("Área Frontal A (m²)", 0.1, 10.0, PRESETS[preset_b]["area"], 0.1, key="area_b")
+            area_b = st.slider("Área Frontal A (m²)", 0.1, 10.0, default_area_b, 0.1, key=f"area_b_{preset_b}")
 
     fd_b = 0.5 * rho * (v_ms ** 2) * cd_b * area_b
 
@@ -200,15 +206,18 @@ if comparar:
         hoverinfo='skip'
     ))
 
+# Define limite dinâmico do eixo Y para garantir que as curvas caibam perfeitamente
+max_y = max(5000, fd_a * 1.2 if not comparar else max(fd_a, fd_b) * 1.2)
+
 fig.update_layout(
     xaxis_title="Velocidade (km/h)",
     yaxis_title="Força de Arrasto (N)",
     template="plotly_white",
     margin=dict(l=20, r=20, t=20, b=20),
     height=400,
-    showlegend=comparar,  # Exibe legenda apenas no modo comparativo
+    showlegend=comparar,
     legend=dict(x=0.02, y=0.98),
-    yaxis=dict(range=[0, max(5000, fd_a * 1.2 if not comparar else max(fd_a, fd_b) * 1.2)], gridcolor='#E5E5E5', showline=True, linewidth=1.5, linecolor='#444444', zeroline=False),
+    yaxis=dict(range=[0, max_y], gridcolor='#E5E5E5', showline=True, linewidth=1.5, linecolor='#444444', zeroline=False),
     xaxis=dict(gridcolor='#E5E5E5', showline=True, linewidth=1.5, linecolor='#444444', zeroline=False)
 )
 
