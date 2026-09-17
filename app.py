@@ -75,31 +75,26 @@ fig.add_trace(go.Scatter(
 fig.update_layout(
     xaxis_title="Velocidade (km/h)",
     yaxis_title="Força de Arrasto (N)",
-    template="plotly_dark",
+    template="plotly_white",  # Mudado para combinar com o fundo claro do Streamlit
     margin=dict(l=20, r=20, t=30, b=20),
     height=400,
     showlegend=False,
-    # Eixo Y com linha vermelha
+    # Eixo Y refinado
     yaxis=dict(
         range=[0, 4000],
-        gridcolor='#2A2A2A',
-        showline=True,
-        linewidth=3,
-        linecolor='#FF2A6D',
-        zeroline=True,
-        zerolinewidth=3,
-        zerolinecolor='#FF2A6D'
+        gridcolor='#E5E5E5',       # Grade cinza bem suave
+        showline=True,             # Desenha a linha do eixo Y
+        linewidth=1.5,             # Espessura discreta
+        linecolor='#444444',       # Cinza escuro elegante
+        zeroline=False             # Remove a linha dupla
     ),
-    # Eixo X com linha vermelha
+    # Eixo X refinado
     xaxis=dict(
-        gridcolor='#2A2A2A',
-        showline=True,
-        linewidth=3,
-        linecolor='#FF2A6D',
-        zeroline=True,
-        zerolinewidth=3,
-        zerolinecolor='#FF2A6D'
+        gridcolor='#E5E5E5',       # Grade cinza bem suave
+        showline=True,             # Desenha a linha do eixo X
+        linewidth=1.5,             # Espessura discreta
+        linecolor='#444444',       # Cinza escuro elegante
+        zeroline=False             # Remove a linha dupla
     )
 )
-
 st.plotly_chart(fig, use_container_width=True)
