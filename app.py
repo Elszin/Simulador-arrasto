@@ -1,6 +1,7 @@
 import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
+import pandas as pd
 
 # Configuração da Página
 st.set_page_config(
@@ -48,19 +49,19 @@ st.markdown("""
 st.markdown('<p class="main-title">⚡ Simulador de Força de Arrasto</p>', unsafe_allow_html=True)
 st.markdown(
     '<p class="sub-title">'
-    'Ferramenta interativa desenvolvida para modelagem, análise e comparação da resistência aerodinâmica '
-    'em meios fluidos entre diferentes geometrias e objetos reais.'
+    'Ferramenta interativa desenvolvida para modelagem, análise de vento relativo e comparação da '
+    'resistência aerodinâmica em meios fluidos.'
     '</p>',
     unsafe_allow_html=True
 )
 
-st.latex(r"F_d = \frac{1}{2} \rho v^2 C_d A")
+st.latex(r"F_d = \frac{1}{2} \rho (v_{veículo} + v_{vento})^2 C_d A")
 
 # Explicação Detalhada das Variáveis
 with st.expander("📖 Entenda as Variáveis da Fórmula", expanded=False):
     st.markdown("""
     <div class="variable-card"><b>ρ (Densidade do Fluido):</b> Mede a massa específica do meio (ex: ar = 1.225 kg/m³). Quanto mais denso o fluido, maior a quantidade de matéria a ser deslocada.</div>
-    <div class="variable-card"><b>v (Velocidade):</b> Parâmetro de maior impacto devido à relação quadrática (v²). Dobrar a velocidade multiplica a força de arrasto por quatro.</div>
+    <div class="variable-card"><b>v<sub>efetiva</sub> (Velocidade Relativa):</b> A soma da velocidade do veículo com a do vento. Vento contra aumenta a velocidade efetiva; vento a favor a diminui.</div>
     <div class="variable-card"><b>C<sub>d</sub> (Coeficiente de Arrasto):</b> Adimensional que quantifica a eficiência aerodinâmica. Depende estritamente do formato e geometria do corpo.</div>
     <div class="variable-card"><b>A (Área Frontal):</b> Projeção da área do objeto perpendicular à direção do fluxo. Quanto maior a área exposta, maior a resistência sofrida.</div>
     """, unsafe_allow_html=True)
@@ -78,13 +79,20 @@ PRESETS = {
 }
 
 # Controle Geral de Ambiente
-col_env1, col_env2 = st.columns(2)
-with col_env1:
-    rho = st.slider("Densidade do ar ρ (kg/m³)", 0.5, 2.0, 1.225, 0.05)
-with col_env2:
-    v_kmh = st.slider("Velocidade de Teste (km/h)", 0.0, 180.0, 108.0, 1.0)
+with st.container(border=True):
+    st.markdown("**🌍 Condições do Ambiente & Velocidade**")
+    col_env1, col_env2, col_env3 = st.columns(3)
+    
+    with col_env1:
+        rho = st.slider("Densidade do ar ρ (kg/m³)", 0.5, 2.0, 1.225, 0.05)
+    with col_env2:
+        v_kmh = st.slider("Velocidade do Veículo (km/h)", 0.0, 180.0, 108.0, 1.0)
+    with col_env3:
+        v_vento_kmh = st.slider("Vento (-Favor / +Contra km/h)", -50.0, 50.0, 0.0, 1.0)
 
-v_ms = v_kmh / 3.6
+# Velocidade Relativa Efetiva
+v_efetiva_kmh = max(0.0, v_kmh + v_vento_kmh)
+v_efetiva_ms = v_efetiva_kmh / 3.6
 
 # Toggle do Modo Comparativo
 comparar = st.toggle("🔀 Ativar Modo Comparativo (Objeto A vs. Objeto B)", value=False)
@@ -105,7 +113,7 @@ with st.container(border=True):
     with col_a2:
         area_a = st.slider("Área Frontal A (m²)", 0.1, 10.0, default_area_a, 0.1, key=f"area_a_{preset_a}")
 
-fd_a = 0.5 * rho * (v_ms ** 2) * cd_a * area_a
+fd_a = 0.5 * rho * (v_efetiva_ms ** 2) * cd_a * area_a
 
 # --- OBJETO B (SE ATIVADO) ---
 if comparar:
@@ -122,7 +130,7 @@ if comparar:
         with col_b2:
             area_b = st.slider("Área Frontal A (m²)", 0.1, 10.0, default_area_b, 0.1, key=f"area_b_{preset_b}")
 
-    fd_b = 0.5 * rho * (v_ms ** 2) * cd_b * area_b
+    fd_b = 0.5 * rho * (v_efetiva_ms ** 2) * cd_b * area_b
 
 st.write("")
 
@@ -137,14 +145,16 @@ if comparar:
 else:
     m_col1, m_col2 = st.columns(2)
     m_col1.metric("Força de Arrasto (Fd)", f"{fd_a:.2f} N")
-    m_col2.metric("Velocidade (v)", f"{v_ms:.1f} m/s", f"{v_kmh:.0f} km/h")
+    m_col2.metric("Velocidade Efetiva do Ar", f"{v_efetiva_ms:.1f} m/s", f"{v_efetiva_kmh:.0f} km/h")
 
 st.write("")
 
 # Vetor da Curva
-v_vetor_ms = np.linspace(0, 180 / 3.6, 100)
-v_vetor_kmh = v_vetor_ms * 3.6
-fd_vetor_a = 0.5 * rho * (v_vetor_ms ** 2) * cd_a * area_a
+v_vetor_kmh = np.linspace(0, 180, 100)
+v_vetor_efetiva_kmh = np.maximum(0.0, v_vetor_kmh + v_vento_kmh)
+v_vetor_efetiva_ms = v_vetor_efetiva_kmh / 3.6
+
+fd_vetor_a = 0.5 * rho * (v_vetor_efetiva_ms ** 2) * cd_a * area_a
 
 # Gráfico
 fig = go.Figure()
@@ -157,7 +167,7 @@ fig.add_trace(go.Scatter(
     line=dict(color='#00D2FF', width=3),
     fill='tozeroy' if not comparar else None,
     fillcolor='rgba(0, 210, 255, 0.08)',
-    hovertemplate='<b>Objeto A</b><br>Velocidade: %{x:.1f} km/h<br>Força: %{y:.2f} N<extra></extra>'
+    hovertemplate='<b>Objeto A</b><br>Velocidade Veículo: %{x:.1f} km/h<br>Força: %{y:.2f} N<extra></extra>'
 ))
 
 # Ponto A
@@ -166,7 +176,7 @@ fig.add_trace(go.Scatter(
     mode='markers',
     name='Ponto A',
     marker=dict(color='#00D2FF', size=11, line=dict(color='#FFFFFF', width=2)),
-    hovertemplate='<b>Atual Objeto A</b><br>v: %{x:.1f} km/h<br>Fd: %{y:.2f} N<extra></extra>'
+    hovertemplate='<b>Atual Objeto A</b><br>v_veículo: %{x:.1f} km/h<br>Fd: %{y:.2f} N<extra></extra>'
 ))
 
 # Linha de Projeção A
@@ -180,14 +190,14 @@ fig.add_trace(go.Scatter(
 
 # Adiciona Objeto B se a comparação estiver ativa
 if comparar:
-    fd_vetor_b = 0.5 * rho * (v_vetor_ms ** 2) * cd_b * area_b
+    fd_vetor_b = 0.5 * rho * (v_vetor_efetiva_ms ** 2) * cd_b * area_b
     
     fig.add_trace(go.Scatter(
         x=v_vetor_kmh, y=fd_vetor_b,
         mode='lines',
         name='Objeto B',
         line=dict(color='#FF2A6D', width=3),
-        hovertemplate='<b>Objeto B</b><br>Velocidade: %{x:.1f} km/h<br>Força: %{y:.2f} N<extra></extra>'
+        hovertemplate='<b>Objeto B</b><br>Velocidade Veículo: %{x:.1f} km/h<br>Força: %{y:.2f} N<extra></extra>'
     ))
     
     fig.add_trace(go.Scatter(
@@ -195,7 +205,7 @@ if comparar:
         mode='markers',
         name='Ponto B',
         marker=dict(color='#FF2A6D', size=11, line=dict(color='#FFFFFF', width=2)),
-        hovertemplate='<b>Atual Objeto B</b><br>v: %{x:.1f} km/h<br>Fd: %{y:.2f} N<extra></extra>'
+        hovertemplate='<b>Atual Objeto B</b><br>v_veículo: %{x:.1f} km/h<br>Fd: %{y:.2f} N<extra></extra>'
     ))
     
     fig.add_trace(go.Scatter(
@@ -206,11 +216,11 @@ if comparar:
         hoverinfo='skip'
     ))
 
-# Define limite dinâmico do eixo Y para garantir que as curvas caibam perfeitamente
+# Define limite dinâmico do eixo Y
 max_y = max(5000, fd_a * 1.2 if not comparar else max(fd_a, fd_b) * 1.2)
 
 fig.update_layout(
-    xaxis_title="Velocidade (km/h)",
+    xaxis_title="Velocidade do Veículo (km/h)",
     yaxis_title="Força de Arrasto (N)",
     template="plotly_white",
     margin=dict(l=20, r=20, t=20, b=20),
@@ -222,3 +232,28 @@ fig.update_layout(
 )
 
 st.plotly_chart(fig, use_container_width=True)
+
+# --- EXPORTAÇÃO DE DADOS ---
+st.write("")
+with st.expander("📥 Exportar Dados da Simulação (CSV)", expanded=False):
+    data_dict = {
+        "Velocidade_Veiculo_kmh": v_vetor_kmh,
+        "Vento_kmh": [v_vento_kmh] * 100,
+        "Velocidade_Efetiva_kmh": v_vetor_efetiva_kmh,
+        "Forca_Arrasto_Objeto_A_N": fd_vetor_a
+    }
+    if comparar:
+        data_dict["Forca_Arrasto_Objeto_B_N"] = fd_vetor_b
+        
+    df_export = pd.DataFrame(data_dict)
+    
+    st.dataframe(df_export.head(10), use_container_width=True)
+    
+    csv_data = df_export.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📄 Baixar Tabela Completa em CSV",
+        data=csv_data,
+        file_name="simulacao_forca_arrasto.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
