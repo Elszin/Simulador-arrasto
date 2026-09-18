@@ -58,7 +58,7 @@ CIDADES_ALTITUDE = {
     "La Paz - Bolívia (~3640 m)": 3640
 }
 
-# Callbacks para atualizar os sliders dinamicamente ao escolher um preset
+# Callbacks para carregar dados dos presets sem sobreposição de estado
 def carregar_preset_a():
     sel = st.session_state.preset_select_a
     base = PRESETS_AQUATICOS if st.session_state.get('is_aquatico', False) else PRESETS_VEICULOS
@@ -135,10 +135,9 @@ with st.sidebar:
 # DIVISÃO DA ÁREA PRINCIPAL
 col_centro, col_direita = st.columns([2.2, 1], gap="medium")
 
-# Seleção de lista de presets
 presets_atuais = PRESETS_AQUATICOS if is_aquatico else PRESETS_VEICULOS
 
-# Inicialização de estado para sliders do objeto A
+# Inicialização de variáveis no session_state para Objeto A
 if "cd_a" not in st.session_state:
     p_init = list(presets_atuais.values())[0]
     st.session_state.cd_a = float(p_init["cd"])
@@ -147,7 +146,7 @@ if "cd_a" not in st.session_state:
     st.session_state.p_a = float(p_init["potencia_cv"])
     st.session_state.comp_a = float(p_init["comprimento"])
 
-# Inicialização de estado para sliders do objeto B
+# Inicialização para Objeto B
 if "cd_b" not in st.session_state:
     p_init_b = list(presets_atuais.values())[1 if len(presets_atuais) > 1 else 0]
     st.session_state.cd_b = float(p_init_b["cd"])
@@ -166,7 +165,7 @@ with col_direita:
         st.markdown("**🔵 Objeto A (Referência)**")
         st.selectbox("Preset do Veículo:", list(presets_atuais.keys()), key="preset_select_a", on_change=carregar_preset_a)
         
-        cd_a = st.slider("C_d (Arrasto):", 0.01, 1.5, st.session_state.cd_a, 0.01, key="cd_a")
+        cd_a = st.slider("C_d (Arrasto do Corpo):", 0.01, 1.5, st.session_state.cd_a, 0.01, key="cd_a")
         area_a = st.slider("Área Frontal A (m²):", 0.1, 50.0, st.session_state.area_a, 0.1, key="area_a")
         massa_a = st.number_input("Massa do Veículo (kg):", value=st.session_state.m_a, step=50.0, key="m_a")
         potencia_cv_a = st.number_input("Potência do Motor (CV):", value=st.session_state.p_a, step=10.0, key="p_a")
@@ -175,21 +174,28 @@ with col_direita:
         usar_aerofolio = st.checkbox("➕ Adicionar Aerofólio / Asas", key="check_asa_a")
         if usar_aerofolio:
             cl_a = st.slider("C_L (Downforce):", 0.0, 2.5, 0.8, 0.1, key="cl_asa_a")
-            area_asa = st.slider("Área da Asa (m²):", 0.1, 3.0, 0.5, 0.1, key="area_asa_a")
+            area_asa_a = st.slider("Área da Asa (m²):", 0.1, 3.0, 0.5, 0.1, key="area_asa_a")
+            # Cálculo de Arrasto Induzido da Asa
+            aspect_ratio = 3.5
+            cd_induzido_asa_a = (cl_a ** 2) / (np.pi * aspect_ratio)
         else:
             cl_a = 0.0
-            area_asa = 0.0
+            area_asa_a = 0.0
+            cd_induzido_asa_a = 0.0
 
     if comparar:
         with st.container(border=True):
             st.markdown("**🔴 Objeto B (Comparativo)**")
             st.selectbox("Preset do Veículo:", list(presets_atuais.keys()), key="preset_select_b", on_change=carregar_preset_b)
             
-            cd_b = st.slider("C_d (Arrasto):", 0.01, 1.5, st.session_state.cd_b, 0.01, key="cd_b")
+            cd_b = st.slider("C_d (Arrasto do Corpo):", 0.01, 1.5, st.session_state.cd_b, 0.01, key="cd_b")
             area_b = st.slider("Área Frontal B (m²):", 0.1, 50.0, st.session_state.area_b, 0.1, key="area_b")
             massa_b = st.number_input("Massa do Veículo (kg):", value=st.session_state.m_b, step=50.0, key="m_b")
             potencia_cv_b = st.number_input("Potência do Motor (CV):", value=st.session_state.p_b, step=10.0, key="p_b")
             comprimento_b = st.number_input("Comprimento do Corpo (m):", value=st.session_state.comp_b, step=0.5, key="comp_b")
+            cl_b = 0.0
+            area_asa_b = 0.0
+            cd_induzido_asa_b = 0.0
 
 # ==========================================
 # CÁLCULOS FÍSICOS
@@ -199,14 +205,19 @@ v_efetiva_ms = v_efetiva_kmh / 3.6
 v_propria_ms = v_kmh / 3.6
 
 crr_a = 0.0 if is_aquatico else 0.012
-fd_a = 0.5 * rho * (v_efetiva_ms ** 2) * cd_a * area_a
+
+# Arrasto do corpo + Arrasto induzido da asa
+fd_corpo_a = 0.5 * rho * (v_efetiva_ms ** 2) * cd_a * area_a
+fd_asa_a = 0.5 * rho * (v_efetiva_ms ** 2) * cd_induzido_asa_a * area_asa_a if usar_aerofolio else 0.0
+fd_a = fd_corpo_a + fd_asa_a
+
 f_rol_a = crr_a * massa_a * 9.81
 f_total_a = fd_a + f_rol_a
 
 pot_watts_a = f_total_a * v_propria_ms
 pot_cv_a = pot_watts_a / 735.5
 
-downforce_a = 0.5 * rho * (v_efetiva_ms ** 2) * cl_a * area_asa
+downforce_a = 0.5 * rho * (v_efetiva_ms ** 2) * cl_a * area_asa_a
 reynolds_a = (rho * v_efetiva_ms * comprimento_a) / viscosidade_din if viscosidade_din > 0 else 0
 
 if tipo_motor == "Combustão (Gasolina/Diesel)":
@@ -271,7 +282,10 @@ with col_centro:
         v_vec_ef = np.maximum(0.1, v_vec + v_vento_kmh) / 3.6
         v_vec_ms = v_vec / 3.6
         
-        fd_vec_a = 0.5 * rho * (v_vec_ef ** 2) * cd_a * area_a
+        fd_vec_corpo_a = 0.5 * rho * (v_vec_ef ** 2) * cd_a * area_a
+        fd_vec_asa_a = 0.5 * rho * (v_vec_ef ** 2) * cd_induzido_asa_a * area_asa_a if usar_aerofolio else 0.0
+        fd_vec_a = fd_vec_corpo_a + fd_vec_asa_a
+        
         f_tot_vec_a = fd_vec_a + f_rol_a
         pot_vec_cv_a = (f_tot_vec_a * v_vec_ms) / 735.5
         
@@ -315,10 +329,9 @@ with col_centro:
 
     # TAB 2: PERFIL & DESENHO 2D DINÂMICO
     with tab_desenho:
-        st.markdown("#### 🎨 Perfil Geométrico & Diagrama de Forças")
+        st.markdown("#### 🎨 Túnel de Vento 2D & Vetores de Força")
         fig_draw = go.Figure()
         
-        # Geometria adaptativa baseada no Cd
         sharpness = max(0.05, 1.0 - (cd_a * 0.8))
         height_geom = np.sqrt(area_a) / 2.0
         
@@ -326,6 +339,7 @@ with col_centro:
         y_top = height_geom * (1 - (2 * x_body / comprimento_a)**2) ** sharpness
         y_bottom = -y_top
         
+        # Desenho do Corpo
         fig_draw.add_trace(go.Scatter(
             x=np.concatenate([x_body, x_body[::-1]]),
             y=np.concatenate([y_top, y_bottom[::-1]]),
@@ -333,8 +347,25 @@ with col_centro:
             line=dict(color='#00D2FF', width=3), name='Geometria A'
         ))
 
-        # Vetor Arrasto (Vermelho)
-        vec_scale = 0.005
+        # Desenho da Asa/Aerofólio se estiver ativo
+        if usar_aerofolio:
+            x_asa = comprimento_a/2.5
+            y_asa = height_geom + 0.3
+            fig_draw.add_trace(go.Scatter(
+                x=[x_asa - 0.3, x_asa + 0.3], y=[y_asa, y_asa + 0.1],
+                mode='lines', line=dict(color='#FFD700', width=6), name='Aerofólio'
+            ))
+            # Vetor Downforce (Verde)
+            fig_draw.add_annotation(
+                x=x_asa, y=y_asa - min(2.0, downforce_a * 0.001),
+                ax=x_asa, ay=y_asa,
+                xref="x", yref="y", axref="x", ayref="y",
+                showarrow=True, arrowhead=3, arrowsize=1.5, arrowwidth=3, arrowcolor="#00FF66",
+                text=f"Downforce = {downforce_a:.0f} N"
+            )
+
+        # Vetor Arrasto Total (Vermelho)
+        vec_scale = 0.002
         fig_draw.add_annotation(
             x=comprimento_a/2 + (fd_a * vec_scale), y=0,
             ax=comprimento_a/2, ay=0,
@@ -366,7 +397,9 @@ with col_centro:
                 st.error("Regime: **Turbulento**")
 
             st.markdown("#### 🏎️ Downforce")
-            st.write(f"**Peso Extra:** `{downforce_a:.1f} N` (~`{downforce_a/9.81:.1f} kg`)")
+            st.write(f"**Peso Extra no Solo:** `{downforce_a:.1f} N` (~`{downforce_a/9.81:.1f} kg`)")
+            if usar_aerofolio:
+                st.write(f"**Arrasto Extra da Asa:** `{fd_asa_a:.1f} N` (Aumenta o consumo)")
 
         with col_f2:
             st.markdown("#### ⚖️ Divisão das Forças")
@@ -375,7 +408,7 @@ with col_centro:
             
             fig_pie = px.pie(
                 values=[pct_arrasto, pct_rolamento],
-                names=['Arrasto do Fluido (Fd)', 'Resistência de Contato'],
+                names=['Arrasto Aerodinâmico Total', 'Resistência de Pneu / Rolamento'],
                 color_discrete_sequence=['#00D2FF', '#FF2A6D'],
                 height=250
             )
