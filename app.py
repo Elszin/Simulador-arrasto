@@ -105,7 +105,6 @@ with st.sidebar:
     
     temp_c = st.slider("Temperatura do Ar (°C)", -10, 50, 20, 1, key="slider_temp")
     
-    # Cálculo da densidade do ar
     temp_k = temp_c + 273.15
     p_atm = 101325 * np.exp(-altitude / 8500)
     rho = p_atm / (287.058 * temp_k)
@@ -128,7 +127,6 @@ with st.sidebar:
 # ==========================================
 col_centro, col_direita = st.columns([2.2, 1], gap="medium")
 
-# Session State Initializer
 if "cd_a" not in st.session_state:
     p_init = list(PRESETS_VEICULOS.values())[0]
     st.session_state.cd_a = float(p_init["cd"])
@@ -273,37 +271,40 @@ with col_centro:
         fig.update_layout(xaxis_title="Velocidade (km/h)", yaxis_title=title_y, template="plotly_white", height=400)
         st.plotly_chart(fig, use_container_width=True)
 
-    # TAB 2: TÚNEL DE VENTO COM ANIMAÇÃO NATIVA NO BROWSER
+    # TAB 2: TÚNEL DE VENTO (VENTO CORRETO: DIREITA PARA A ESQUERDA)
     with tab_desenho:
         st.markdown("#### 🌀 Fluxo de Ar no Túnel de Vento")
-        st.caption(f"🌡️ **{temp_c}°C** ($\rho$: **{rho:.3f} kg/m³**) | 💨 Fluxo: **{v_efetiva_ms*3.6:.1f} km/h** | Clique no botão **Play ▶️** abaixo do gráfico para animar!")
+        st.caption(f"🌡️ **{temp_c}°C** ($\rho$: **{rho:.3f} kg/m³**) | 💨 Fluxo Frontal: **{v_efetiva_ms*3.6:.1f} km/h** | Clique em **Play ▶️** para ativar o fluxo!")
 
         tipo_veiculo_a = PRESETS_VEICULOS[modelo_a]["tipo"]
         altura_a = np.sqrt(area_a) * 0.95
         x_carro, y_carro = gerar_silhueta_veiculo(tipo_veiculo_a, comprimento_a, altura_a)
         
-        x_asa_pos = comprimento_a * 0.38
+        # O carro está virado para a DIREITA (+X)
+        x_asa_pos = -comprimento_a * 0.38
         y_asa_pos = altura_a * 0.82
         
         num_linhas = 12
         pts_por_linha = 35
         
-        x_min, x_max = -comprimento_a * 1.2, comprimento_a * 2.0
+        x_min, x_max = -comprimento_a * 1.8, comprimento_a * 1.2
         largura_grid = x_max - x_min
         
         x_grid_base = np.linspace(x_min, x_max, pts_por_linha)
         y_iniciais = np.linspace(-altura_a * 0.3, altura_a * 2.5, num_linhas)
         R_eff = altura_a * (0.8 + cd_a * 0.4)
 
-        # Função auxiliar para gerar partículas de um quadro
+        # Cálculo do campo com sentido de fluxo invertido (Direita -> Esquerda)
         def calcular_particulas(offset):
             px_l, py_l, vel_l, sz_l = [], [], [], []
             for y0 in y_iniciais:
                 for x_raw in x_grid_base:
-                    x = x_min + ((x_raw - x_min + offset) % largura_grid)
+                    # O offset subtrai para andar da Direita para a Esquerda (+X -> -X)
+                    x = x_max - ((x_max - x_raw + offset) % largura_grid)
                     
                     r2_carro = x**2 + (y0 - altura_a*0.5)**2
-                    dy_carro = (R_eff**2 * max(0.1, y0)) / max(r2_carro, R_eff**1.8) * np.exp(-((x + comprimento_a*0.1) / (comprimento_a*0.7))**2)
+                    # Desvio aerodinâmico corrigido na dianteira
+                    dy_carro = (R_eff**2 * max(0.1, y0)) / max(r2_carro, R_eff**1.8) * np.exp(-((x - comprimento_a*0.1) / (comprimento_a*0.7))**2)
                     
                     dy_asa = 0.0
                     v_boost_asa = 0.0
@@ -325,12 +326,12 @@ with col_centro:
                     sz_l.append(4 + (v_local_total / 12.0))
             return px_l, py_l, vel_l, sz_l
 
-        # Quadro 0 (Inicial)
+        # Quadro Inicial (0)
         px0, py0, vel0, sz0 = calcular_particulas(0.0)
 
         fig_tunel = go.Figure()
 
-        # Trace 0: Partículas de Ar
+        # Partículas de Ar
         fig_tunel.add_trace(go.Scatter(
             x=px0, y=py0,
             mode='markers',
@@ -344,17 +345,17 @@ with col_centro:
             name='Moléculas de Ar'
         ))
 
-        # Trace 1: Silhueta Veículo
+        # Silhueta do Veículo
         fig_tunel.add_trace(go.Scatter(
             x=x_carro, y=y_carro,
             fill='toself', fillcolor='rgba(25, 28, 36, 0.95)',
             line=dict(color='#00D2FF', width=3), name='Veículo A'
         ))
 
-        # Trace 2 & 3: Rodas
+        # Rodas
         r_raio = altura_a * 0.22
-        x_roda_front = -comprimento_a * 0.3
-        x_roda_tras = comprimento_a * 0.3
+        x_roda_front = comprimento_a * 0.3
+        x_roda_tras = -comprimento_a * 0.3
         theta = np.linspace(0, 2*np.pi, 20)
 
         fig_tunel.add_trace(go.Scatter(
@@ -366,7 +367,7 @@ with col_centro:
             fill='toself', fillcolor='#111', line=dict(color='#555', width=2), showlegend=False
         ))
 
-        # Aerofólio (se ativo)
+        # Aerofólio
         if usar_aerofolio:
             fig_tunel.add_trace(go.Scatter(
                 x=[x_asa_pos, x_asa_pos], y=[y_asa_pos - 0.15*altura_a, y_asa_pos],
@@ -374,22 +375,22 @@ with col_centro:
             ))
             ang = 0.15 + (cl_a * 0.08)
             x_asa_line = [x_asa_pos - 0.2*comprimento_a*0.2, x_asa_pos + 0.2*comprimento_a*0.2]
-            y_asa_line = [y_asa_pos - 0.1*altura_a*ang, y_asa_pos + 0.1*altura_a*ang]
+            y_asa_line = [y_asa_pos + 0.1*altura_a*ang, y_asa_pos - 0.1*altura_a*ang]
             fig_tunel.add_trace(go.Scatter(
                 x=x_asa_line, y=y_asa_line,
                 mode='lines', line=dict(color='#FFD700', width=6), name='Aerofólio'
             ))
 
-        # Anotação de Arrasto
+        # Vetor de Arrasto empurrando para a ESQUERDA
         vec_scale = 0.002
         fig_tunel.add_annotation(
-            x=comprimento_a/2 + (fd_a * vec_scale), y=altura_a*0.5, ax=comprimento_a/2, ay=altura_a*0.5,
+            x=-comprimento_a/2 - (fd_a * vec_scale), y=altura_a*0.5, ax=-comprimento_a/2, ay=altura_a*0.5,
             xref="x", yref="y", axref="x", ayref="y",
             showarrow=True, arrowhead=3, arrowsize=1.5, arrowwidth=3, arrowcolor="#FF2A6D",
             text=f"Fd = {fd_a:.0f} N"
         )
 
-        # GERAR QUADROS DE ANIMAÇÃO NATIVOS
+        # Quadros da Animação
         num_frames = 20
         frames = []
         passo_offsets = np.linspace(0, largura_grid, num_frames, endpoint=False)
@@ -413,10 +414,10 @@ with col_centro:
 
         fig_tunel.frames = frames
 
-        # CONFIGURAÇÃO DE CONTROLES E BOTÕES DE PLAY/PAUSE
+        # Layout com controles nativos de Play/Pause
         fig_tunel.update_layout(
             template="plotly_dark", height=480,
-            xaxis=dict(range=[-comprimento_a*1.1, comprimento_a*1.8], title="Comprimento (m)"),
+            xaxis=dict(range=[-comprimento_a*1.8, comprimento_a*1.2], title="Comprimento (m)"),
             yaxis=dict(range=[-0.1, altura_a*2.2], title="Altura (m)"),
             showlegend=False,
             updatemenus=[{
