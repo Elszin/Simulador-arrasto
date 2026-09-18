@@ -74,9 +74,7 @@ with st.sidebar:
     st.markdown("**🏔️ Altitude & Atmosfera**")
     cidade_preset = st.selectbox("Presets de Altitude:", list(CIDADES_ALTITUDE.keys()), index=0, key="select_cidade_alt")
     
-    # Lógica do modo personalizado vs preset fixo
     is_custom = (cidade_preset == "Personalizado")
-    
     if not is_custom:
         val_alt = CIDADES_ALTITUDE[cidade_preset]
         altitude = st.slider("Altitude (m)", 0, 5000, val_alt, 100, disabled=True, key="slider_altitude_preset")
@@ -85,7 +83,7 @@ with st.sidebar:
     
     temp_c = st.slider("Temperatura do Ar (°C)", -10, 50, 20, 1, key="slider_temp")
     
-    # Cálculo físico da densidade do ar em função da altitude e temperatura
+    # Cálculo da densidade do ar
     temp_k = temp_c + 273.15
     p_atm = 101325 * np.exp(-altitude / 8500)
     rho = p_atm / (287.058 * temp_k)
@@ -108,7 +106,7 @@ with st.sidebar:
 # ==========================================
 col_centro, col_direita = st.columns([2.2, 1], gap="medium")
 
-# Inicialização de Session State
+# Inicialização do Session State
 if "cd_a" not in st.session_state:
     p_init = list(PRESETS_VEICULOS.values())[0]
     st.session_state.cd_a = float(p_init["cd"])
@@ -126,7 +124,7 @@ if "cd_b" not in st.session_state:
     st.session_state.comp_b = float(p_init_b["comprimento"])
 
 # ==========================================
-# COLUNA DIREITA: AJUSTES DOS OBJETOS (CAIXAS RETRÁTEIS)
+# COLUNA DIREITA: AJUSTES DOS OBJETOS
 # ==========================================
 with col_direita:
     st.markdown("### 📐 Geometria do Veículo")
@@ -144,12 +142,9 @@ with col_direita:
         if usar_aerofolio:
             cl_a = st.slider("C_L (Downforce):", 0.1, 2.0, 0.8, 0.1, key="cl_asa_a")
             area_asa_a = st.slider("Área da Asa (m²):", 0.1, 2.0, 0.4, 0.1, key="area_asa_a")
-            # Arrasto induzido gerado pela asa
             cd_induzido_asa_a = (cl_a ** 2) / (np.pi * 3.5)
         else:
-            cl_a = 0.0
-            area_asa_a = 0.0
-            cd_induzido_asa_a = 0.0
+            cl_a, area_asa_a, cd_induzido_asa_a = 0.0, 0.0, 0.0
 
     if comparar:
         with st.expander("🔴 **Objeto B (Comparativo)**", expanded=False):
@@ -167,7 +162,7 @@ with col_direita:
 # ==========================================
 v_efetiva_ms = max(0.0, v_kmh + v_vento_kmh) / 3.6
 v_propria_ms = v_kmh / 3.6
-crr = 0.012  # Coeficiente de resistência ao rolamento dos pneus
+crr = 0.012
 
 # Objeto A
 fd_corpo_a = 0.5 * rho * (v_efetiva_ms ** 2) * cd_a * area_a
@@ -213,7 +208,7 @@ with col_centro:
     
     tab_grafico, tab_desenho, tab_pie = st.tabs([
         "📊 Curvas de Desempenho", 
-        "🎨 Perfil 2D & Vetores", 
+        "🌀 Túnel de Vento & Partículas", 
         "⚖️ Divisão das Forças"
     ])
 
@@ -256,11 +251,13 @@ with col_centro:
         fig.update_layout(xaxis_title="Velocidade (km/h)", yaxis_title=title_y, template="plotly_white", height=400)
         st.plotly_chart(fig, use_container_width=True)
 
-    # TAB 2: PERFIL 2D DINÂMICO
+    # TAB 2: TÚNEL DE VENTO COM PARTÍCULAS / MOLÉCULAS DE AR
     with tab_desenho:
-        st.markdown("#### 🎨 Túnel de Vento 2D & Vetores de Força")
+        st.markdown("#### 🌀 Simulação de Moléculas de Ar Contornando o Veículo")
+        
         fig_draw = go.Figure()
         
+        # 1. Geometria do Veículo
         sharpness = max(0.05, 1.0 - (cd_a * 0.8))
         height_geom = np.sqrt(area_a) / 2.0
         
@@ -268,15 +265,60 @@ with col_centro:
         y_top = height_geom * (1 - (2 * x_body / comprimento_a)**2) ** sharpness
         y_bottom = -y_top
         
-        # Geometria do Corpo
+        # 2. Geração das Partículas / Moléculas de Ar
+        num_linhas = 22
+        pts_por_linha = 45
+        
+        x_grid = np.linspace(-comprimento_a*1.2, comprimento_a*2.0, pts_por_linha)
+        y_iniciais = np.linspace(-height_geom*2.5, height_geom*2.5, num_linhas)
+        
+        px_list, py_list, vel_list = [], [], []
+        
+        # Simulação aproximada de campo de escoamento potencial ao redor de um obstáculo
+        R_eff = height_geom * (1.1 + cd_a * 0.3)
+        
+        for y0 in y_iniciais:
+            if abs(y0) < 0.05:
+                y0 = 0.05  # Evita divisão por zero no centro exato
+            for x in x_grid:
+                r2 = x**2 + y0**2
+                # Fator de desvio baseado na proximidade do corpo
+                factor = 1.0 + (R_eff**2) / max(r2, R_eff**2 * 0.5)
+                
+                # Deslocamento vertical das partículas contornando o carro
+                dy = (R_eff**2 * y0) / max(r2, R_eff**2) * np.exp(-(x / (comprimento_a*0.8))**2)
+                y_part = y0 + dy
+                
+                # Desaceleração na frente/trás (ponto de estagnação) e aceleração nas laterais
+                v_relativa = v_efetiva_ms * (1.0 - (R_eff**2 * (x**2 - y0**2)) / max(r2**2, R_eff**4))
+                
+                px_list.append(x)
+                py_list.append(y_part)
+                vel_list.append(abs(v_relativa) * 3.6)  # km/h
+        
+        # Desenhar as Moléculas de Ar (Coloridas pela Velocidade)
+        fig_draw.add_trace(go.Scatter(
+            x=px_list, y=py_list,
+            mode='markers',
+            marker=dict(
+                size=5,
+                color=vel_list,
+                colorscale='Turbo',
+                showscale=True,
+                colorbar=dict(title="Velocidade (km/h)", len=0.8)
+            ),
+            name='Moléculas de Ar'
+        ))
+
+        # Desenhar o Corpo do Veículo por Cima das Partículas
         fig_draw.add_trace(go.Scatter(
             x=np.concatenate([x_body, x_body[::-1]]),
             y=np.concatenate([y_top, y_bottom[::-1]]),
-            fill='toself', fillcolor='rgba(0, 210, 255, 0.3)',
+            fill='toself', fillcolor='rgba(20, 20, 25, 0.95)',
             line=dict(color='#00D2FF', width=3), name='Objeto A'
         ))
 
-        # Aerofólio & Downforce
+        # Aerofólio (se ativado)
         if usar_aerofolio:
             x_asa = comprimento_a/2.5
             y_asa = height_geom + 0.3
@@ -284,14 +326,8 @@ with col_centro:
                 x=[x_asa - 0.3, x_asa + 0.3], y=[y_asa, y_asa + 0.1],
                 mode='lines', line=dict(color='#FFD700', width=6), name='Aerofólio'
             ))
-            fig_draw.add_annotation(
-                x=x_asa, y=y_asa - min(2.0, downforce_a * 0.001), ax=x_asa, ay=y_asa,
-                xref="x", yref="y", axref="x", ayref="y",
-                showarrow=True, arrowhead=3, arrowsize=1.5, arrowwidth=3, arrowcolor="#00FF66",
-                text=f"Downforce = {downforce_a:.0f} N"
-            )
 
-        # Seta do Arrasto
+        # Seta do Vetor de Arrasto
         vec_scale = 0.002
         fig_draw.add_annotation(
             x=comprimento_a/2 + (fd_a * vec_scale), y=0, ax=comprimento_a/2, ay=0,
@@ -301,9 +337,9 @@ with col_centro:
         )
 
         fig_draw.update_layout(
-            template="plotly_dark", height=380,
-            xaxis=dict(range=[-comprimento_a*1.2, comprimento_a*2.2], title="Comprimento (m)"),
-            yaxis=dict(range=[-height_geom*3, height_geom*3], title="Altura (m)"),
+            template="plotly_dark", height=420,
+            xaxis=dict(range=[-comprimento_a*1.2, comprimento_a*2.0], title="Comprimento (m)"),
+            yaxis=dict(range=[-height_geom*2.8, height_geom*2.8], title="Altura (m)"),
             showlegend=False
         )
         st.plotly_chart(fig_draw, use_container_width=True)
