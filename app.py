@@ -4,23 +4,18 @@ import plotly.express as px
 import numpy as np
 import pandas as pd
 
-# 1. Configuração da Página
+# ==========================================
+# 1. CONFIGURAÇÃO DA PÁGINA
+# ==========================================
 st.set_page_config(
     page_title="Simulador Avançado de Aerodinâmica & Mecânica dos Fluidos",
     page_icon="⚡",
     layout="wide"
 )
 
-# Estilização CSS Avançada
+# Estilização CSS
 st.markdown("""
     <style>
-    div[data-testid="stColumn"]:nth-child(1) {
-        position: sticky;
-        top: 1rem;
-        align-self: flex-start;
-        z-index: 99;
-    }
-    
     .main-title {
         font-size: 2.2rem;
         font-weight: 900;
@@ -28,23 +23,6 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin-bottom: 0px;
-    }
-    
-    .variable-card {
-        background-color: #0E1117;
-        color: #FAFAFA;
-        border-left: 4px solid #00D2FF;
-        padding: 8px 12px;
-        margin-bottom: 6px;
-        border-radius: 4px;
-        font-size: 0.85rem;
-    }
-    
-    .status-badge {
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-weight: bold;
-        font-size: 0.8rem;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -57,35 +35,35 @@ FLUIDOS = {
     "Customizado": {"rho": 1.225, "visc": 1.81e-5}
 }
 
-PRESETS_TERRESTRES = {
-    "Carro Popular (Hatch/Sedan)": {"cd": 0.32, "area": 2.2, "massa": 1100, "potencia_cv": 100, "crr": 0.012, "comprimento": 4.0},
-    "Carro Esportivo (Supercarro)": {"cd": 0.28, "area": 1.9, "massa": 1400, "potencia_cv": 450, "crr": 0.015, "comprimento": 4.5},
-    "Carro Elétrico (Design Aerodinâmico)": {"cd": 0.21, "area": 2.1, "massa": 1800, "potencia_cv": 300, "crr": 0.010, "comprimento": 4.7},
-    "Caminhão / Ônibus": {"cd": 0.80, "area": 8.0, "massa": 12000, "potencia_cv": 400, "crr": 0.008, "comprimento": 12.0},
-    "Ciclista em Pé (Gravel/Urbano)": {"cd": 0.90, "area": 0.6, "massa": 85, "potencia_cv": 0.4, "crr": 0.005, "comprimento": 1.5},
-    "Paraquedista (Aberto)": {"cd": 1.20, "area": 1.5, "massa": 80, "potencia_cv": 0, "crr": 0.0, "comprimento": 1.8}
+PRESETS_VEICULOS = {
+    "Carro Popular (Hatch/Sedan)": {"cd": 0.32, "area": 2.2, "massa": 1100.0, "potencia_cv": 100.0, "crr": 0.012, "comprimento": 4.0},
+    "Carro Esportivo (Supercarro)": {"cd": 0.28, "area": 1.9, "massa": 1400.0, "potencia_cv": 450.0, "crr": 0.015, "comprimento": 4.5},
+    "Carro Elétrico (Design Aerodinâmico)": {"cd": 0.21, "area": 2.1, "massa": 1800.0, "potencia_cv": 300.0, "crr": 0.010, "comprimento": 4.7},
+    "Caminhão / Ônibus": {"cd": 0.80, "area": 8.0, "massa": 12000.0, "potencia_cv": 400.0, "crr": 0.008, "comprimento": 12.0},
+    "Ciclista em Pé (Gravel/Urbano)": {"cd": 0.90, "area": 0.6, "massa": 85.0, "potencia_cv": 0.4, "crr": 0.005, "comprimento": 1.5},
+    "Paraquedista (Aberto)": {"cd": 1.20, "area": 1.5, "massa": 80.0, "potencia_cv": 0.0, "crr": 0.0, "comprimento": 1.8}
 }
 
 PRESETS_AQUATICOS = {
-    "Lancha Esportiva / Jet Ski": {"cd": 0.25, "area": 1.8, "massa": 900, "potencia_cv": 250, "crr": 0.0, "comprimento": 5.0},
-    "Barco de Carga / Navio": {"cd": 0.45, "area": 25.0, "massa": 45000, "potencia_cv": 1200, "crr": 0.0, "comprimento": 20.0},
-    "Submarino Hidrodinâmico": {"cd": 0.12, "area": 6.0, "massa": 25000, "potencia_cv": 800, "crr": 0.0, "comprimento": 15.0},
-    "Caiaque de Corrida": {"cd": 0.30, "area": 0.4, "massa": 95, "potencia_cv": 0.6, "crr": 0.0, "comprimento": 4.5}
+    "Lancha Esportiva / Jet Ski": {"cd": 0.35, "area": 1.8, "massa": 900.0, "potencia_cv": 250.0, "crr": 0.0, "comprimento": 5.5},
+    "Navio de Carga / Petroleiro": {"cd": 0.85, "area": 45.0, "massa": 500000.0, "potencia_cv": 15000.0, "crr": 0.0, "comprimento": 180.0},
+    "Submarino Hidrodinâmico": {"cd": 0.15, "area": 12.0, "massa": 80000.0, "potencia_cv": 4000.0, "crr": 0.0, "comprimento": 35.0},
+    "Caiaque / Remo": {"cd": 0.25, "area": 0.5, "massa": 95.0, "potencia_cv": 0.5, "crr": 0.0, "comprimento": 3.2}
 }
 
 CIDADES_ALTITUDE = {
-    "Personalizado": None,
     "Nível do Mar (0 m)": 0,
     "São Paulo / Curitiba (~800 m)": 800,
     "Cidade do México (~2240 m)": 2240,
     "La Paz - Bolívia (~3640 m)": 3640
 }
 
-# Funções para sincronização de presets no session_state
+# Callbacks para atualizar os sliders dinamicamente ao escolher um preset
 def carregar_preset_a():
-    preset_nome = st.session_state.get("select_preset_a")
-    if preset_nome and preset_nome in presets_atuais:
-        p = presets_atuais[preset_nome]
+    sel = st.session_state.preset_select_a
+    base = PRESETS_AQUATICOS if st.session_state.get('is_aquatico', False) else PRESETS_VEICULOS
+    if sel in base:
+        p = base[sel]
         st.session_state.cd_a = float(p["cd"])
         st.session_state.area_a = float(p["area"])
         st.session_state.m_a = float(p["massa"])
@@ -93,127 +71,17 @@ def carregar_preset_a():
         st.session_state.comp_a = float(p["comprimento"])
 
 def carregar_preset_b():
-    preset_nome = st.session_state.get("select_preset_b")
-    if preset_nome and preset_nome in presets_atuais:
-        p = presets_atuais[preset_nome]
+    sel = st.session_state.preset_select_b
+    base = PRESETS_AQUATICOS if st.session_state.get('is_aquatico', False) else PRESETS_VEICULOS
+    if sel in base:
+        p = base[sel]
         st.session_state.cd_b = float(p["cd"])
         st.session_state.area_b = float(p["area"])
         st.session_state.m_b = float(p["massa"])
         st.session_state.p_b = float(p["potencia_cv"])
         st.session_state.comp_b = float(p["comprimento"])
 
-# Initialização de estado para Objeto A e B
-if "cd_a" not in st.session_state:
-    p_default = PRESETS_TERRESTRES["Carro Popular (Hatch/Sedan)"]
-    st.session_state.cd_a = float(p_default["cd"])
-    st.session_state.area_a = float(p_default["area"])
-    st.session_state.m_a = float(p_default["massa"])
-    st.session_state.p_a = float(p_default["potencia_cv"])
-    st.session_state.comp_a = float(p_default["comprimento"])
-
-if "cd_b" not in st.session_state:
-    p_default_b = PRESETS_TERRESTRES["Carro Esportivo (Supercarro)"]
-    st.session_state.cd_b = float(p_default_b["cd"])
-    st.session_state.area_b = float(p_default_b["area"])
-    st.session_state.m_b = float(p_default_b["massa"])
-    st.session_state.p_b = float(p_default_b["potencia_cv"])
-    st.session_state.comp_b = float(p_default_b["comprimento"])
-
-with st.sidebar:
-    st.markdown("### ⚙️ Configurações Gerais")
-    st.write("---")
-    
-    st.markdown("**🌊 Fluido & Termodinâmica**")
-    fluido_sel = st.selectbox("Fluido Base:", list(FLUIDOS.keys()), index=0)
-    is_ar = "Ar" in fluido_sel
-    is_agua = "Água" in fluido_sel
-    presets_atuais = PRESETS_AQUATICOS if is_agua else PRESETS_TERRESTRES
-
-    if is_ar:
-        st.markdown("**🏔️ Simulador de Altitude & Temperatura**")
-        cidade_preset = st.selectbox("Presets de Altitude:", list(CIDADES_ALTITUDE.keys()), index=1)
-        val_alt = CIDADES_ALTITUDE[cidade_preset] if CIDADES_ALTITUDE[cidade_preset] is not None else 0
-        altitude = st.slider("Altitude (m)", 0, 5000, val_alt, 100)
-        temp_c = st.slider("Temperatura do Ar (°C)", -10, 50, 20, 1)
-        
-        # Correção Barométrica + Temperatura (Gases Ideais)
-        temp_k = temp_c + 273.15
-        p_atm = 101325 * np.exp(-altitude / 8500) # Pressão em Pa
-        rho_calc = p_atm / (287.058 * temp_k)     # Densidade corrigida (kg/m³)
-        
-        st.caption(f"💡 Densidade do Ar ($\rho$): **{rho_calc:.3f} kg/m³**")
-        rho = rho_calc
-        viscosidade_din = 1.81e-5 * ((temp_k / 293.15) ** 0.7)
-    else:
-        rho = st.slider("Densidade ρ (kg/m³)", 0.1, 1100.0, FLUIDOS[fluido_sel]["rho"], 0.1)
-        viscosidade_din = FLUIDOS[fluido_sel]["visc"]
-
-    st.write("---")
-    st.markdown("**⚡ Propulsão & Eficiência**")
-    tipo_motor = st.radio("Tipo de Motorização:", ["Combustão (Gasolina/Diesel)", "Elétrico (EV)"])
-    
-    if tipo_motor == "Combustão (Gasolina/Diesel)":
-        preco_comb = st.number_input("Preço Combustível (R$/L):", value=5.80, step=0.10)
-        eficiencia_motor = st.slider("Eficiência Térmica (%)", 15, 45, 30) / 100.0
-    else:
-        preco_kwh = st.number_input("Preço da Energia (R$/kWh):", value=0.85, step=0.05)
-        eficiencia_motor = st.slider("Eficiência Elétrica (%)", 75, 95, 90) / 100.0
-        capacidade_bateria = st.number_input("Capacidade da Bateria (kWh):", value=60.0, step=5.0)
-
-    st.write("---")
-    comparar = st.toggle("🔀 Modo Comparativo de Objetos", value=False)
-
-# DIVISÃO DA ÁREA PRINCIPAL
-col_centro, col_direita = st.columns([2.2, 1], gap="medium")
-
 # ==========================================
-# COLUNA DIREITA: PARÂMETROS DO OBJETO
-# ==========================================
-with col_direita:
-    st.markdown("### 📐 Geometria & Dinâmica")
-    
-    with st.container(border=True):
-        st.markdown("**🔵 Objeto A (Referência)**")
-        
-        # Sincronizador de Presets com Callback
-        st.selectbox(
-            "Preset do Veículo:",
-            list(presets_atuais.keys()),
-            key="select_preset_a",
-            on_change=carregar_preset_a
-        )
-        
-        cd_a = st.slider("C_d (Arrasto):", 0.01, 1.5, key="cd_a", step=0.01)
-        area_a = st.slider("Área Frontal A (m²):", 0.1, 25.0, key="area_a", step=0.1)
-        massa_a = st.number_input("Massa do Veículo (kg):", key="m_a", step=50.0)
-        potencia_cv_a = st.number_input("Potência do Motor (CV):", key="p_a", step=10.0)
-        comprimento_a = st.number_input("Comprimento do Corpo (m):", key="comp_a", step=0.5)
-        
-        # Módulo Asa / Downforce opcional
-        usar_aerofolio = st.checkbox("➕ Adicionar Aerofólio / Asas")
-        if usar_aerofolio:
-            cl_a = st.slider("C_L (Sustentação/Downforce):", 0.0, 2.5, 0.8, 0.1)
-            area_asa = st.slider("Área da Asa (m²):", 0.1, 3.0, 0.5, 0.1)
-        else:
-            cl_a = 0.0
-            area_asa = 0.0
-
-    if comparar:
-        with st.container(border=True):
-            st.markdown("**🔴 Objeto B (Comparativo)**")
-            st.selectbox(
-                "Preset do Veículo B:",
-                list(presets_atuais.keys()),
-                key="select_preset_b",
-                on_change=carregar_preset_b
-            )
-            
-            cd_b = st.slider("C_d (Arrasto):", 0.01, 1.5, key="cd_b", step=0.01)
-            area_b = st.slider("Área Frontal B (m²):", 0.1, 25.0, key="area_b", step=0.1)
-            massa_b = st.number_input("Massa do Veículo (kg):", key="m_b", step=50.0)
-            potencia_cv_b = st.number_input("Potência do Motor (CV):", key="p_b", step=10.0)
-            comprimento_b = st.number_input("Comprimento do Corpo (m):", key="comp_b", step=0.5)
-
 # BARRA LATERAL: CONFIGURAÇÕES AMBIENTAIS E MOTOR
 # ==========================================
 with st.sidebar:
@@ -221,47 +89,72 @@ with st.sidebar:
     st.write("---")
     
     st.markdown("**🌊 Fluido & Termodinâmica**")
-    fluido_sel = st.selectbox("Fluido Base:", list(FLUIDOS.keys()), index=0)
+    fluido_sel = st.selectbox("Fluido Base:", list(FLUIDOS.keys()), index=0, key="select_fluido_base")
+    
     is_ar = "Ar" in fluido_sel
-    is_agua = "Água" in fluido_sel
-    presets_atuais = PRESETS_AQUATICOS if is_agua else PRESETS_TERRESTRES
+    is_aquatico = "Água" in fluido_sel
+    st.session_state.is_aquatico = is_aquatico
 
     if is_ar:
-        st.markdown("**🏔️ Simulador de Altitude & Temperatura**")
-        cidade_preset = st.selectbox("Presets de Altitude:", list(CIDADES_ALTITUDE.keys()), index=1)
-        val_alt = CIDADES_ALTITUDE[cidade_preset] if CIDADES_ALTITUDE[cidade_preset] is not None else 0
-        altitude = st.slider("Altitude (m)", 0, 5000, val_alt, 100)
-        temp_c = st.slider("Temperatura do Ar (°C)", -10, 50, 20, 1)
+        st.markdown("**🏔️ Altitude & Temperatura**")
+        cidade_preset = st.selectbox("Presets de Altitude:", list(CIDADES_ALTITUDE.keys()), index=0, key="select_cidade_alt")
+        val_alt = CIDADES_ALTITUDE[cidade_preset]
+        altitude = st.slider("Altitude (m)", 0, 5000, val_alt, 100, key="slider_altitude")
+        temp_c = st.slider("Temperatura do Ar (°C)", -10, 50, 20, 1, key="slider_temp")
         
-        # Correção Barométrica + Temperatura (Gases Ideais)
         temp_k = temp_c + 273.15
-        p_atm = 101325 * np.exp(-altitude / 8500) # Pressão em Pa
-        rho_calc = p_atm / (287.058 * temp_k)     # Densidade corrigida (kg/m³)
+        p_atm = 101325 * np.exp(-altitude / 8500)
+        rho_calc = p_atm / (287.058 * temp_k)
         
         st.caption(f"💡 Densidade do Ar ($\rho$): **{rho_calc:.3f} kg/m³**")
         rho = rho_calc
-        viscosidade_din = 1.81e-5 * ((temp_k / 293.15) ** 0.7) # Correção Sutherland simplificada
+        viscosidade_din = 1.81e-5 * ((temp_k / 293.15) ** 0.7)
     else:
-        rho = st.slider("Densidade ρ (kg/m³)", 0.1, 1100.0, FLUIDOS[fluido_sel]["rho"], 0.1)
+        rho = st.slider("Densidade ρ (kg/m³)", 0.1, 1100.0, float(FLUIDOS[fluido_sel]["rho"]), 0.1, key="slider_rho_custom")
         viscosidade_din = FLUIDOS[fluido_sel]["visc"]
 
     st.write("---")
     st.markdown("**⚡ Propulsão & Eficiência**")
-    tipo_motor = st.radio("Tipo de Motorização:", ["Combustão (Gasolina/Diesel)", "Elétrico (EV)"])
+    tipo_motor = st.radio("Tipo de Motorização:", ["Combustão (Gasolina/Diesel)", "Elétrico (EV)"], key="radio_tipo_motor")
     
     if tipo_motor == "Combustão (Gasolina/Diesel)":
-        preco_comb = st.number_input("Preço Combustível (R$/L):", value=5.80, step=0.10)
-        eficiencia_motor = st.slider("Eficiência Térmica (%)", 15, 45, 30) / 100.0
+        preco_comb = st.number_input("Preço Combustível (R$/L):", value=5.80, step=0.10, key="input_preco_comb")
+        eficiencia_motor = st.slider("Eficiência Térmica (%)", 15, 45, 30, key="slider_efic_comb") / 100.0
     else:
-        preco_kwh = st.number_input("Preço da Energia (R$/kWh):", value=0.85, step=0.05)
-        eficiencia_motor = st.slider("Eficiência Elétrica (%)", 75, 95, 90) / 100.0
-        capacidade_bateria = st.number_input("Capacidade da Bateria (kWh):", value=60.0, step=5.0)
+        preco_kwh = st.number_input("Preço da Energia (R$/kWh):", value=0.85, step=0.05, key="input_preco_kwh")
+        eficiencia_motor = st.slider("Eficiência Elétrica (%)", 75, 95, 90, key="slider_efic_eletrica") / 100.0
+        capacidade_bateria = st.number_input("Capacidade da Bateria (kWh):", value=60.0, step=5.0, key="input_bateria_kwh")
 
     st.write("---")
-    comparar = st.toggle("🔀 Modo Comparativo de Objetos", value=False)
+    v_kmh = st.slider("Velocidade do Corpo (km/h)", 0.0, 250.0, 110.0, 1.0, key="slider_v_kmh")
+    v_vento_kmh = st.slider("Vento / Correnteza (-Favor / +Contra km/h)", -50.0, 50.0, 0.0, 1.0, key="slider_v_vento")
+
+    st.write("---")
+    comparar = st.toggle("🔀 Modo Comparativo de Objetos", value=False, key="toggle_comparar")
 
 # DIVISÃO DA ÁREA PRINCIPAL
 col_centro, col_direita = st.columns([2.2, 1], gap="medium")
+
+# Seleção de lista de presets
+presets_atuais = PRESETS_AQUATICOS if is_aquatico else PRESETS_VEICULOS
+
+# Inicialização de estado para sliders do objeto A
+if "cd_a" not in st.session_state:
+    p_init = list(presets_atuais.values())[0]
+    st.session_state.cd_a = float(p_init["cd"])
+    st.session_state.area_a = float(p_init["area"])
+    st.session_state.m_a = float(p_init["massa"])
+    st.session_state.p_a = float(p_init["potencia_cv"])
+    st.session_state.comp_a = float(p_init["comprimento"])
+
+# Inicialização de estado para sliders do objeto B
+if "cd_b" not in st.session_state:
+    p_init_b = list(presets_atuais.values())[1 if len(presets_atuais) > 1 else 0]
+    st.session_state.cd_b = float(p_init_b["cd"])
+    st.session_state.area_b = float(p_init_b["area"])
+    st.session_state.m_b = float(p_init_b["massa"])
+    st.session_state.p_b = float(p_init_b["potencia_cv"])
+    st.session_state.comp_b = float(p_init_b["comprimento"])
 
 # ==========================================
 # COLUNA DIREITA: PARÂMETROS DO OBJETO
@@ -271,20 +164,18 @@ with col_direita:
     
     with st.container(border=True):
         st.markdown("**🔵 Objeto A (Referência)**")
-        preset_a = st.selectbox("Preset do Veículo:", list(presets_atuais.keys()), index=0)
-        p_a = presets_atuais[preset_a]
+        st.selectbox("Preset do Veículo:", list(presets_atuais.keys()), key="preset_select_a", on_change=carregar_preset_a)
         
-        cd_a = st.slider("C_d (Arrasto):", 0.01, 1.5, p_a["cd"], 0.01, key="cd_a")
-        area_a = st.slider("Área Frontal A (m²):", 0.1, 25.0, p_a["area"], 0.1, key="area_a")
-        massa_a = st.number_input("Massa do Veículo (kg):", value=float(p_a["massa"]), step=50.0, key="m_a")
-        potencia_cv_a = st.number_input("Potência do Motor (CV):", value=float(p_a["potencia_cv"]), step=10.0, key="p_a")
-        comprimento_a = st.number_input("Comprimento do Corpo (m):", value=float(p_a["comprimento"]), step=0.5, key="comp_a")
+        cd_a = st.slider("C_d (Arrasto):", 0.01, 1.5, st.session_state.cd_a, 0.01, key="cd_a")
+        area_a = st.slider("Área Frontal A (m²):", 0.1, 50.0, st.session_state.area_a, 0.1, key="area_a")
+        massa_a = st.number_input("Massa do Veículo (kg):", value=st.session_state.m_a, step=50.0, key="m_a")
+        potencia_cv_a = st.number_input("Potência do Motor (CV):", value=st.session_state.p_a, step=10.0, key="p_a")
+        comprimento_a = st.number_input("Comprimento do Corpo (m):", value=st.session_state.comp_a, step=0.5, key="comp_a")
         
-        # Módulo Asa / Downforce opcional
-        usar_aerofolio = st.checkbox("➕ Adicionar Aerofólio / Asas")
+        usar_aerofolio = st.checkbox("➕ Adicionar Aerofólio / Asas", key="check_asa_a")
         if usar_aerofolio:
-            cl_a = st.slider("C_L (Coeficiente de Sustentação/Downforce):", 0.0, 2.5, 0.8, 0.1)
-            area_asa = st.slider("Área da Asa (m²):", 0.1, 3.0, 0.5, 0.1)
+            cl_a = st.slider("C_L (Downforce):", 0.0, 2.5, 0.8, 0.1, key="cl_asa_a")
+            area_asa = st.slider("Área da Asa (m²):", 0.1, 3.0, 0.5, 0.1, key="area_asa_a")
         else:
             cl_a = 0.0
             area_asa = 0.0
@@ -292,58 +183,47 @@ with col_direita:
     if comparar:
         with st.container(border=True):
             st.markdown("**🔴 Objeto B (Comparativo)**")
-            preset_b = st.selectbox("Preset do Veículo:", list(presets_atuais.keys()), index=min(1, len(presets_atuais)-1))
-            p_b = presets_atuais[preset_b]
+            st.selectbox("Preset do Veículo:", list(presets_atuais.keys()), key="preset_select_b", on_change=carregar_preset_b)
             
-            cd_b = st.slider("C_d (Arrasto):", 0.01, 1.5, p_b["cd"], 0.01, key="cd_b")
-            area_b = st.slider("Área Frontal B (m²):", 0.1, 25.0, p_b["area"], 0.1, key="area_b")
-            massa_b = st.number_input("Massa do Veículo (kg):", value=float(p_b["massa"]), step=50.0, key="m_b")
-            potencia_cv_b = st.number_input("Potência do Motor (CV):", value=float(p_b["potencia_cv"]), step=10.0, key="p_b")
-            comprimento_b = st.number_input("Comprimento do Corpo (m):", value=float(p_b["comprimento"]), step=0.5, key="comp_b")
+            cd_b = st.slider("C_d (Arrasto):", 0.01, 1.5, st.session_state.cd_b, 0.01, key="cd_b")
+            area_b = st.slider("Área Frontal B (m²):", 0.1, 50.0, st.session_state.area_b, 0.1, key="area_b")
+            massa_b = st.number_input("Massa do Veículo (kg):", value=st.session_state.m_b, step=50.0, key="m_b")
+            potencia_cv_b = st.number_input("Potência do Motor (CV):", value=st.session_state.p_b, step=10.0, key="p_b")
+            comprimento_b = st.number_input("Comprimento do Corpo (m):", value=st.session_state.comp_b, step=0.5, key="comp_b")
 
 # ==========================================
-# CÁLCULOS FÍSICOS PRINCIPAIS
+# CÁLCULOS FÍSICOS
 # ==========================================
-# Velocidade e Vento
-v_kmh = st.sidebar.slider("Velocidade do Corpo (km/h)", 0.0, 250.0, 110.0, 1.0)
-v_vento_kmh = st.sidebar.slider("Vento / Correnteza (-Favor / +Contra km/h)", -50.0, 50.0, 0.0, 1.0)
-
 v_efetiva_kmh = max(0.0, v_kmh + v_vento_kmh)
 v_efetiva_ms = v_efetiva_kmh / 3.6
 v_propria_ms = v_kmh / 3.6
 
-# Objeto A
+crr_a = 0.0 if is_aquatico else 0.012
 fd_a = 0.5 * rho * (v_efetiva_ms ** 2) * cd_a * area_a
-f_rol_a = p_a["crr"] * massa_a * 9.81
+f_rol_a = crr_a * massa_a * 9.81
 f_total_a = fd_a + f_rol_a
 
 pot_watts_a = f_total_a * v_propria_ms
 pot_cv_a = pot_watts_a / 735.5
 
-# Downforce
 downforce_a = 0.5 * rho * (v_efetiva_ms ** 2) * cl_a * area_asa
-
-# Número de Reynolds (Re = (ρ * v * L) / μ)
 reynolds_a = (rho * v_efetiva_ms * comprimento_a) / viscosidade_din if viscosidade_din > 0 else 0
 
-# Consumo & Custos
 if tipo_motor == "Combustão (Gasolina/Diesel)":
-    # 32 MJ por Litro de Gasolina
     consumo_l_h_a = (pot_watts_a / eficiencia_motor) / (32e6 / 3600) if v_kmh > 0 else 0
     consumo_100km_a = (consumo_l_h_a / v_kmh) * 100 if v_kmh > 0 else 0
     custo_100km_a = consumo_100km_a * preco_comb
     autonomia_a = 0
 else:
-    # Elétrico (kWh/100km)
     consumo_kwh_h_a = (pot_watts_a / eficiencia_motor) / 1000.0 if v_kmh > 0 else 0
     consumo_100km_a = (consumo_kwh_h_a / v_kmh) * 100 if v_kmh > 0 else 0
     custo_100km_a = consumo_100km_a * preco_kwh
     autonomia_a = (capacidade_bateria / consumo_100km_a) * 100 if consumo_100km_a > 0 else 0
 
-# Objeto B (Se comparativo)
 if comparar:
+    crr_b = 0.0 if is_aquatico else 0.012
     fd_b = 0.5 * rho * (v_efetiva_ms ** 2) * cd_b * area_b
-    f_rol_b = p_b["crr"] * massa_b * 9.81
+    f_rol_b = crr_b * massa_b * 9.81
     f_total_b = fd_b + f_rol_b
     pot_watts_b = f_total_b * v_propria_ms
     pot_cv_b = pot_watts_b / 735.5
@@ -363,7 +243,6 @@ if comparar:
 with col_centro:
     st.markdown('<p class="main-title">⚡ Simulador Avançado de Mecânica dos Fluidos</p>', unsafe_allow_html=True)
     
-    # METRICAS DE CABEÇALHO
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Força de Arrasto (Fd)", f"{fd_a:.1f} N")
     m2.metric("Potência Exigida", f"{pot_cv_a:.1f} CV")
@@ -377,126 +256,29 @@ with col_centro:
 
     st.write("---")
     
-    # ABAS PRINCIPAIS INCLUINDO DESENHO INTERATIVO
-    tab_desenho, tab_grafico, tab_física, tab_ranking = st.tabs([
-        "🎨 Perfil & Desenho 2D", 
+    tab_grafico, tab_desenho, tab_fisica, tab_ranking = st.tabs([
         "📊 Curvas & Desempenho", 
+        "🎨 Perfil & Desenho 2D", 
         "🔬 Análise Física Avançada", 
         "🏆 Comparador de Frota"
     ])
 
-    # ----------------------------------------------------
-    # TAB 0: DESENHO DINÂMICO 2D & VETORES DE FORÇA
-    # ----------------------------------------------------
-    with tab_desenho:
-        st.markdown("#### 🎨 Perfil Aerodinâmico & Vetores de Força em Tempo Real")
-        st.caption("O perfil visual do veículo, o escoamento do ar e os vetores de força mudam dinamicamente conforme os parâmetros.")
-        
-        # Função para gerar desenho dinâmico baseado em parâmetros geométricos e Cd
-        def criar_desenho_aerodinamico(cd, area, comp, downforce, fd, v_kmh):
-            fig_draw = go.Figure()
-            
-            # Cálculo proporcional de altura/largura visual
-            altura_vis = np.sqrt(area)
-            comp_vis = max(comp, 1.2)
-            
-            # Gerar perfil de corpo (Gota fluida para Cd baixo, bloco para Cd alto)
-            x_body = np.linspace(0, comp_vis, 100)
-            
-            # Coeficiente de forma aerodinâmica
-            sharpness = max(0.1, 1.2 - cd * 0.8)
-            y_upper = (altura_vis / 2) * (np.sin(np.pi * (x_body / comp_vis) ** sharpness))
-            y_lower = -y_upper
-            
-            # Desenhar corpo principal do veículo
-            fig_draw.add_trace(go.Scatter(
-                x=np.concatenate([x_body, x_body[::-1]]),
-                y=np.concatenate([y_upper, y_lower[::-1]]),
-                fill='toself',
-                fillcolor='rgba(0, 210, 255, 0.25)',
-                line=dict(color='#00D2FF', width=3),
-                name='Geometria do Veículo'
-            ))
-
-            # Desenhar Linhas de Fluxo (Streamlines)
-            for offset in np.linspace(-altura_vis * 1.5, altura_vis * 1.5, 7):
-                if abs(offset) < 0.1:
-                    continue
-                
-                # Desvio da linha de vento em volta do corpo
-                x_stream = np.linspace(-comp_vis * 0.8, comp_vis * 1.8, 80)
-                deflection = np.exp(-((x_stream - comp_vis*0.3)**2) / (comp_vis*0.8)**2) * (offset * (1 + cd*0.5))
-                y_stream = offset + deflection * (1 if offset > 0 else -1) * 0.3
-                
-                # Turbulência na esteira traseira (Wake region) maior para Cd alto
-                wake_mask = x_stream > comp_vis
-                if cd > 0.3:
-                    y_stream[wake_mask] += np.sin(x_stream[wake_mask] * 12) * (cd * 0.12 * abs(offset))
-
-                fig_draw.add_trace(go.Scatter(
-                    x=x_stream, y=y_stream,
-                    mode='lines',
-                    line=dict(color='rgba(255, 255, 255, 0.35)', width=1.5, dash='dash' if cd > 0.4 else 'solid'),
-                    showlegend=False
-                ))
-
-            # VETORES DE FORÇA
-            scale_f = max(fd, 1.0)
-            
-            # Vetor de Arrasto Fd (Seta para trás)
-            fig_draw.add_annotation(
-                x=comp_vis * 1.25, y=0,
-                ax=0, ay=0,
-                xref="x", yref="y", axref="x", ayref="y",
-                showarrow=True, arrowhead=2, arrowsize=1.5, arrowwidth=4, arrowcolor="#FF2A6D",
-                text=f"<b>Fd = {fd:.0f} N</b>",
-                font=dict(color="#FF2A6D", size=13)
-            )
-            
-            # Vetor de Sustentação / Downforce FL (Seta para baixo se hover wing)
-            if downforce > 0:
-                fig_draw.add_annotation(
-                    x=comp_vis * 0.7, y=-altura_vis * 0.8,
-                    ax=comp_vis * 0.7, ay=0,
-                    xref="x", yref="y", axref="x", ayref="y",
-                    showarrow=True, arrowhead=2, arrowsize=1.5, arrowwidth=3, arrowcolor="#FFD700",
-                    text=f"<b>Downforce = {downforce:.0f} N</b>",
-                    font=dict(color="#FFD700", size=12)
-                )
-
-            fig_draw.update_layout(
-                xaxis=dict(range=[-comp_vis, comp_vis * 2.2], title="Comprimento (m)", showgrid=False),
-                yaxis=dict(range=[-altura_vis * 2.2, altura_vis * 2.2], title="Altura Relativa (m)", showgrid=False),
-                template="plotly_dark",
-                height=430,
-                margin=dict(l=20, r=20, t=20, b=20)
-            )
-            return fig_draw
-
-        st.plotly_chart(
-            criar_desenho_aerodinamico(cd_a, area_a, comprimento_a, downforce_a, fd_a, v_kmh),
-            use_container_width=True
-        )
-
-    # ----------------------------------------------------
-    # TAB 1: GRÁFICOS INTERATIVOS DE DESEMPENHO
-    # ----------------------------------------------------
+    # TAB 1: CURVAS & DESEMPENHO
     with tab_grafico:
-        opcao_grafico = st.radio("Selecione o Eixo Y:", ["Força de Arrasto (N)", "Potência Necessária (CV)", "Custo Financeiro (R$/100km)"], horizontal=True)
+        opcao_grafico = st.radio("Selecione o Eixo Y:", ["Força de Arrasto (N)", "Potência Necessária (CV)", "Custo Financeiro (R$/100km)"], horizontal=True, key="radio_grafico_y")
         
         v_vec = np.linspace(1, 250, 120)
         v_vec_ef = np.maximum(0.1, v_vec + v_vento_kmh) / 3.6
         v_vec_ms = v_vec / 3.6
         
-        # Vetorização Objeto A
         fd_vec_a = 0.5 * rho * (v_vec_ef ** 2) * cd_a * area_a
         f_tot_vec_a = fd_vec_a + f_rol_a
         pot_vec_cv_a = (f_tot_vec_a * v_vec_ms) / 735.5
         
         if tipo_motor == "Combustão (Gasolina/Diesel)":
-            cons_vec_a = (((f_tot_vec_a * v_vec_ms) / eficiencia_motor) / (32e6 / 3600) / v_vec) * 100 * preco_comb
+            cons_vec_a = (((f_tot_vec_a * v_vec_ms) / eficiencia_motor) / (32e6 / 3600) / np.maximum(1.0, v_vec)) * 100 * preco_comb
         else:
-            cons_vec_a = (((f_tot_vec_a * v_vec_ms) / eficiencia_motor) / 1000.0 / v_vec) * 100 * preco_kwh
+            cons_vec_a = (((f_tot_vec_a * v_vec_ms) / eficiencia_motor) / 1000.0 / np.maximum(1.0, v_vec)) * 100 * preco_kwh
 
         if opcao_grafico == "Força de Arrasto (N)":
             y_a = fd_vec_a; y_p_a = fd_a; title_y = "Força de Arrasto (N)"
@@ -509,9 +291,8 @@ with col_centro:
         fig.add_trace(go.Scatter(x=v_vec, y=y_a, mode='lines', name='Objeto A', line=dict(color='#00D2FF', width=3)))
         fig.add_trace(go.Scatter(x=[v_kmh], y=[y_p_a], mode='markers', name='Ponto Atual A', marker=dict(color='#00D2FF', size=10)))
 
-        # Cruzamento de Potência Máxima do Motor
         if opcao_grafico == "Potência Necessária (CV)":
-            fig.add_hline(y=potencia_cv_a, line_dash="dash", line_color="#FFD700", annotation_text=f"Potência Máx Motor ({potencia_cv_a:.0f} CV)")
+            fig.add_hline(y=potencia_cv_a, line_dash="dash", line_color="#FFD700", annotation_text=f"Potência Máx Motor ({potencia_cv_a} CV)")
 
         if comparar:
             fd_vec_b = 0.5 * rho * (v_vec_ef ** 2) * cd_b * area_b
@@ -519,9 +300,9 @@ with col_centro:
             pot_vec_cv_b = (f_tot_vec_b * v_vec_ms) / 735.5
             
             if tipo_motor == "Combustão (Gasolina/Diesel)":
-                cons_vec_b = (((f_tot_vec_b * v_vec_ms) / eficiencia_motor) / (32e6 / 3600) / v_vec) * 100 * preco_comb
+                cons_vec_b = (((f_tot_vec_b * v_vec_ms) / eficiencia_motor) / (32e6 / 3600) / np.maximum(1.0, v_vec)) * 100 * preco_comb
             else:
-                cons_vec_b = (((f_tot_vec_b * v_vec_ms) / eficiencia_motor) / 1000.0 / v_vec) * 100 * preco_kwh
+                cons_vec_b = (((f_tot_vec_b * v_vec_ms) / eficiencia_motor) / 1000.0 / np.maximum(1.0, v_vec)) * 100 * preco_kwh
 
             y_b = fd_vec_b if opcao_grafico == "Força de Arrasto (N)" else (pot_vec_cv_b if opcao_grafico == "Potência Necessária (CV)" else cons_vec_b)
             y_p_b = fd_b if opcao_grafico == "Força de Arrasto (N)" else (pot_cv_b if opcao_grafico == "Potência Necessária (CV)" else custo_100km_b)
@@ -532,41 +313,84 @@ with col_centro:
         fig.update_layout(xaxis_title="Velocidade (km/h)", yaxis_title=title_y, template="plotly_white", height=420)
         st.plotly_chart(fig, use_container_width=True)
 
-    # ----------------------------------------------------
-    # TAB 2: ANÁLISE FÍSICA AVANÇADA (REYNOLDS & DOWNFORCE)
-    # ----------------------------------------------------
-    with tab_física:
-        col_f1, col_f2 = st.columns(2)
+    # TAB 2: PERFIL & DESENHO 2D DINÂMICO
+    with tab_desenho:
+        st.markdown("#### 🎨 Perfil Geométrico & Diagrama de Forças")
+        fig_draw = go.Figure()
         
+        # Geometria adaptativa baseada no Cd
+        sharpness = max(0.05, 1.0 - (cd_a * 0.8))
+        height_geom = np.sqrt(area_a) / 2.0
+        
+        x_body = np.linspace(-comprimento_a/2, comprimento_a/2, 100)
+        y_top = height_geom * (1 - (2 * x_body / comprimento_a)**2) ** sharpness
+        y_bottom = -y_top
+        
+        fig_draw.add_trace(go.Scatter(
+            x=np.concatenate([x_body, x_body[::-1]]),
+            y=np.concatenate([y_top, y_bottom[::-1]]),
+            fill='toself', fillcolor='rgba(0, 210, 255, 0.3)',
+            line=dict(color='#00D2FF', width=3), name='Geometria A'
+        ))
+
+        # Vetor Arrasto (Vermelho)
+        vec_scale = 0.005
+        fig_draw.add_annotation(
+            x=comprimento_a/2 + (fd_a * vec_scale), y=0,
+            ax=comprimento_a/2, ay=0,
+            xref="x", yref="y", axref="x", ayref="y",
+            showarrow=True, arrowhead=3, arrowsize=1.5, arrowwidth=3, arrowcolor="#FF2A6D",
+            text=f"Fd = {fd_a:.0f} N"
+        )
+
+        fig_draw.update_layout(
+            template="plotly_dark", height=380,
+            xaxis=dict(range=[-comprimento_a*1.2, comprimento_a*2.2], title="Comprimento (m)"),
+            yaxis=dict(range=[-height_geom*3, height_geom*3], title="Altura (m)"),
+            showlegend=False
+        )
+        st.plotly_chart(fig_draw, use_container_width=True)
+
+    # TAB 3: ANÁLISE FÍSICA
+    with tab_fisica:
+        col_f1, col_f2 = st.columns(2)
         with col_f1:
             st.markdown("#### 🌀 Número de Reynolds ($Re$)")
             st.write(f"**$Re$ Calculado:** `{reynolds_a:.2e}`")
             
             if reynolds_a < 2e3:
-                st.success("Regime do Escoamento: **Laminar** (Fluidos calmos e organizados)")
+                st.success("Regime: **Laminar**")
             elif 2e3 <= reynolds_a <= 4e3:
-                st.warning("Regime do Escoamento: **De Transição**")
+                st.warning("Regime: **Transição**")
             else:
-                st.error("Regime do Escoamento: **Turbulento** (Vórtices e turbulência dominam)")
+                st.error("Regime: **Turbulento**")
 
-            st.markdown("#### 🏎️ Carga Aerodinâmica (*Downforce*)")
-            st.write(f"**Peso Extra Gerado nas Rodas:** `{downforce_a:.1f} N` (~`{downforce_a/9.81:.1f} kg`)")
+            st.markdown("#### 🏎️ Downforce")
+            st.write(f"**Peso Extra:** `{downforce_a:.1f} N` (~`{downforce_a/9.81:.1f} kg`)")
 
         with col_f2:
-            st.markdown("#### ⚖️ Divisão das Forças de Resistência")
-            pct_arrasto = (fd_a / f_total_a) * 100 if f_total_a > 0 else 0
+            st.markdown("#### ⚖️ Divisão das Forças")
+            pct_arrasto = (fd_a / f_total_a) * 100 if f_total_a > 0 else 100
             pct_rolamento = (f_rol_a / f_total_a) * 100 if f_total_a > 0 else 0
             
             fig_pie = px.pie(
                 values=[pct_arrasto, pct_rolamento],
-                names=['Arrasto do Ar (Fd)', 'Atrito dos Pneus (F_rol)'],
+                names=['Arrasto do Fluido (Fd)', 'Resistência de Contato'],
                 color_discrete_sequence=['#00D2FF', '#FF2A6D'],
                 height=250
             )
             st.plotly_chart(fig_pie, use_container_width=True)
 
-    # ----------------------------------------------------
-    # TAB 3: RANKING COMPARATIVO DE FROTA
-    # ----------------------------------------------------
+    # TAB 4: RANKING DE FROTA
     with tab_ranking:
         st.markdown("#### 🏆 Comparação da Força de Arrasto a 120 km/h")
+        nomes_veic, forcas_veic = [], []
+        
+        for nome, dados in presets_atuais.items():
+            fd_temp = 0.5 * rho * ((120/3.6)**2) * dados["cd"] * dados["area"]
+            nomes_veic.append(nome)
+            forcas_veic.append(fd_temp)
+            
+        df_rank = pd.DataFrame({"Veículo": nomes_veic, "Arrasto (N)": forcas_veic}).sort_values("Arrasto (N)")
+        fig_bar = px.bar(df_rank, x="Arrasto (N)", y="Veículo", orientation='h', color="Arrasto (N)", color_continuous_scale="Viridis", height=350)
+        st.plotly_chart(fig_bar, use_container_width=True)
