@@ -49,28 +49,23 @@ def gerar_silhueta_veiculo(tipo, comprimento, altura):
     H = altura
     
     if tipo == "esportivo":
-        # Perfil baixo, capô longo e suave, traseira fluida
         x = np.array([-0.50, -0.48, -0.35, -0.10,  0.15,  0.40,  0.48,  0.50,  0.50, -0.50]) * L
         y = np.array([ 0.15,  0.30,  0.40,  0.95,  0.85,  0.50,  0.35,  0.15,  0.00,  0.00]) * H
     elif tipo == "suv":
-        # Frente alta e robusta, teto reto, traseira truncada
         x = np.array([-0.50, -0.48, -0.38, -0.18,  0.25,  0.45,  0.48,  0.50,  0.50, -0.50]) * L
         y = np.array([ 0.15,  0.55,  0.60,  0.98,  0.98,  0.90,  0.35,  0.15,  0.00,  0.00]) * H
     elif tipo == "caminhao":
-        # Frente completamente vertical, teto alto e reto, baú/traseira retangular
         x = np.array([-0.50, -0.49, -0.48,  0.48,  0.49,  0.50,  0.50, -0.50]) * L
         y = np.array([ 0.10,  0.95,  0.98,  0.98,  0.95,  0.10,  0.00,  0.00]) * H
     elif tipo == "ciclista":
-        # Formato de ciclista/bike compacto
         x = np.array([-0.40, -0.30, -0.15,  0.05,  0.25,  0.35,  0.25,  0.00, -0.25, -0.40]) * L
         y = np.array([ 0.30,  0.70,  0.95,  0.85,  0.60,  0.25,  0.05,  0.05,  0.05,  0.30]) * H
-    else:  # Hatch / Sedan (Padrão)
+    else:  # Hatch / Sedan
         x = np.array([-0.50, -0.47, -0.32, -0.12,  0.20,  0.38,  0.47,  0.50,  0.50, -0.50]) * L
         y = np.array([ 0.15,  0.45,  0.52,  0.96,  0.94,  0.60,  0.30,  0.15,  0.00,  0.00]) * H
         
     return x, y
 
-# Callbacks para carregar dados dos presets
 def carregar_preset_a():
     sel = st.session_state.preset_select_a
     if sel in PRESETS_VEICULOS:
@@ -110,7 +105,7 @@ with st.sidebar:
     
     temp_c = st.slider("Temperatura do Ar (°C)", -10, 50, 20, 1, key="slider_temp")
     
-    # Cálculo da densidade do ar
+    # Cálculo da densidade do ar (Ideal Gas Law)
     temp_k = temp_c + 273.15
     p_atm = 101325 * np.exp(-altitude / 8500)
     rho = p_atm / (287.058 * temp_k)
@@ -133,7 +128,7 @@ with st.sidebar:
 # ==========================================
 col_centro, col_direita = st.columns([2.2, 1], gap="medium")
 
-# Inicialização do Session State
+# Session State Initializer
 if "cd_a" not in st.session_state:
     p_init = list(PRESETS_VEICULOS.values())[0]
     st.session_state.cd_a = float(p_init["cd"])
@@ -235,7 +230,7 @@ with col_centro:
     
     tab_grafico, tab_desenho, tab_pie = st.tabs([
         "📊 Curvas de Desempenho", 
-        "🌀 Túnel de Vento & Partículas", 
+        "🌀 Túnel de Vento & Termodinâmica", 
         "⚖️ Divisão das Forças"
     ])
 
@@ -278,54 +273,55 @@ with col_centro:
         fig.update_layout(xaxis_title="Velocidade (km/h)", yaxis_title=title_y, template="plotly_white", height=400)
         st.plotly_chart(fig, use_container_width=True)
 
-    # TAB 2: TÚNEL DE VENTO COM FORMAs REALISTAS E MOLÉCULAS DE AR
+    # TAB 2: TÚNEL DE VENTO COM DENSIDADE E ENERGIA CINÉTICA DAS MOLÉCULAS
     with tab_desenho:
-        st.markdown("#### 🌀 Simulação de Moléculas de Ar Contornando a Forma Real do Veículo")
+        st.markdown("#### 🌀 Densidade de Moléculas (Temperatura) e Energia de Impacto (Velocidade)")
+        st.caption(f"🌡️ **{temp_c}°C** → Densidade de Moléculas: **{rho:.3f} kg/m³** | 💨 Velocidade do Fluxo: **{v_efetiva_ms*3.6:.1f} km/h**")
         
         fig_draw = go.Figure()
         
-        # 1. Obter Silhueta Específica do Veículo
+        # 1. Silhueta do Veículo
         tipo_veiculo_a = PRESETS_VEICULOS[modelo_a]["tipo"]
         altura_a = np.sqrt(area_a) * 0.95
-        
         x_carro, y_carro = gerar_silhueta_veiculo(tipo_veiculo_a, comprimento_a, altura_a)
         
-        # 2. Simulação das Partículas / Moléculas de Ar
-        num_linhas = 24
-        pts_por_linha = 48
+        # 2. Densidade de Moléculas proporcional à Temperatura (Densidade do Ar rho)
+        # Se rho for maior (frio/mar), geramos mais linhas de partículas. Se menor (quente/alto), geramos menos.
+        num_linhas = int(np.clip(14 + (rho - 0.8) * 20, 10, 30))
+        pts_por_linha = 45
         
         x_grid = np.linspace(-comprimento_a * 1.2, comprimento_a * 2.0, pts_por_linha)
         y_iniciais = np.linspace(-altura_a * 0.3, altura_a * 2.6, num_linhas)
         
-        px_list, py_list, vel_list = [], [], []
+        px_list, py_list, vel_list, size_list = [], [], [], []
         
-        # Fator de Perturbação Aerodinâmica
         R_eff = altura_a * (0.8 + cd_a * 0.4)
         
         for y0 in y_iniciais:
             for x in x_grid:
-                # Distância e desvio vertical em relação ao formato real
                 r2 = x**2 + (y0 - altura_a*0.5)**2
                 
-                # Moléculas contornam por cima do teto e capô
+                # Desvio de trajetória contornando a forma do carro
                 dy = (R_eff**2 * max(0.1, y0)) / max(r2, R_eff**1.8) * np.exp(-((x + comprimento_a*0.1) / (comprimento_a*0.7))**2)
-                
-                # Impedir que moléculas atravessem o chão
                 y_part = max(0.02, y0 + dy)
                 
-                # Aceleração/Desaceleração do ar (Ponto de Estagnação na Frente e Vácuo Traseiro)
+                # Variação da velocidade local em m/s
                 v_relativa = v_efetiva_ms * (1.0 - (R_eff**2 * (x**2 - (y0-altura_a*0.5)**2)) / max(r2**2, R_eff**3.5))
                 
                 px_list.append(x)
                 py_list.append(y_part)
                 vel_list.append(abs(v_relativa) * 3.6)
+                
+                # Tamanho das partículas varia com a energia de impacto (velocidade + densidade)
+                p_size = 4 + (abs(v_relativa) / 10.0)
+                size_list.append(p_size)
 
         # Desenhar Moléculas de Ar
         fig_draw.add_trace(go.Scatter(
             x=px_list, y=py_list,
             mode='markers',
             marker=dict(
-                size=5,
+                size=size_list,
                 color=vel_list,
                 colorscale='Turbo',
                 showscale=True,
@@ -334,25 +330,23 @@ with col_centro:
             name='Moléculas de Ar'
         ))
 
-        # Desenhar a Lataria / Silhueta do Veículo
+        # Desenhar Silhueta do Veículo
         fig_draw.add_trace(go.Scatter(
             x=x_carro, y=y_carro,
             fill='toself', fillcolor='rgba(25, 28, 36, 0.95)',
             line=dict(color='#00D2FF', width=3), name='Veículo A'
         ))
 
-        # Adicionar Rodas para Aumentar o Reconhecimento Visual
+        # Rodas
         r_raio = altura_a * 0.22
         x_roda_front = -comprimento_a * 0.3
         x_roda_tras = comprimento_a * 0.3
-        
         theta = np.linspace(0, 2*np.pi, 20)
-        # Roda Traseira
+        
         fig_draw.add_trace(go.Scatter(
             x=x_roda_tras + r_raio*np.cos(theta), y=r_raio + r_raio*np.sin(theta),
             fill='toself', fillcolor='#111', line=dict(color='#555', width=2), showlegend=False
         ))
-        # Roda Dianteira
         fig_draw.add_trace(go.Scatter(
             x=x_roda_front + r_raio*np.cos(theta), y=r_raio + r_raio*np.sin(theta),
             fill='toself', fillcolor='#111', line=dict(color='#555', width=2), showlegend=False
@@ -367,7 +361,7 @@ with col_centro:
                 mode='lines', line=dict(color='#FFD700', width=6), name='Aerofólio'
             ))
 
-        # Vetor da Força de Arrasto (Seta Vermelha)
+        # Vetor de Arrasto
         vec_scale = 0.002
         fig_draw.add_annotation(
             x=comprimento_a/2 + (fd_a * vec_scale), y=altura_a*0.5, ax=comprimento_a/2, ay=altura_a*0.5,
