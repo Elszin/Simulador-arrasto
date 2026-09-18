@@ -28,11 +28,11 @@ st.markdown("""
 
 # Presets de Veículos Terrestres
 PRESETS_VEICULOS = {
-    "Carro Popular (Hatch/Sedan)": {"cd": 0.32, "area": 2.2, "massa": 1100.0, "potencia_cv": 100.0, "comprimento": 4.0},
-    "Carro Esportivo (Supercarro)": {"cd": 0.28, "area": 1.9, "massa": 1400.0, "potencia_cv": 450.0, "comprimento": 4.5},
-    "SUV / Caminhonete": {"cd": 0.40, "area": 2.8, "massa": 1900.0, "potencia_cv": 180.0, "comprimento": 4.8},
-    "Caminhão / Ônibus": {"cd": 0.80, "area": 8.0, "massa": 12000.0, "potencia_cv": 400.0, "comprimento": 12.0},
-    "Ciclista em Pé": {"cd": 0.90, "area": 0.6, "massa": 85.0, "potencia_cv": 0.4, "comprimento": 1.5}
+    "Carro Popular (Hatch/Sedan)": {"cd": 0.32, "area": 2.2, "massa": 1100.0, "potencia_cv": 100.0, "comprimento": 4.0, "tipo": "hatch"},
+    "Carro Esportivo (Supercarro)": {"cd": 0.28, "area": 1.9, "massa": 1400.0, "potencia_cv": 450.0, "comprimento": 4.5, "tipo": "esportivo"},
+    "SUV / Caminhonete": {"cd": 0.40, "area": 2.8, "massa": 1900.0, "potencia_cv": 180.0, "comprimento": 4.8, "tipo": "suv"},
+    "Caminhão / Ônibus": {"cd": 0.80, "area": 8.0, "massa": 12000.0, "potencia_cv": 400.0, "comprimento": 12.0, "tipo": "caminhao"},
+    "Ciclista em Pé": {"cd": 0.90, "area": 0.6, "massa": 85.0, "potencia_cv": 0.4, "comprimento": 1.5, "tipo": "ciclista"}
 }
 
 CIDADES_ALTITUDE = {
@@ -43,7 +43,34 @@ CIDADES_ALTITUDE = {
     "La Paz - Bolívia (~3640 m)": 3640
 }
 
-# Callbacks para carregar dados dos presets de veículos
+# FUNÇÃO PARA GERAR A SILHUETA MÁTRICA DE CADA MODELO DE VEÍCULO
+def gerar_silhueta_veiculo(tipo, comprimento, altura):
+    L = comprimento
+    H = altura
+    
+    if tipo == "esportivo":
+        # Perfil baixo, capô longo e suave, traseira fluida
+        x = np.array([-0.50, -0.48, -0.35, -0.10,  0.15,  0.40,  0.48,  0.50,  0.50, -0.50]) * L
+        y = np.array([ 0.15,  0.30,  0.40,  0.95,  0.85,  0.50,  0.35,  0.15,  0.00,  0.00]) * H
+    elif tipo == "suv":
+        # Frente alta e robusta, teto reto, traseira truncada
+        x = np.array([-0.50, -0.48, -0.38, -0.18,  0.25,  0.45,  0.48,  0.50,  0.50, -0.50]) * L
+        y = np.array([ 0.15,  0.55,  0.60,  0.98,  0.98,  0.90,  0.35,  0.15,  0.00,  0.00]) * H
+    elif tipo == "caminhao":
+        # Frente completamente vertical, teto alto e reto, baú/traseira retangular
+        x = np.array([-0.50, -0.49, -0.48,  0.48,  0.49,  0.50,  0.50, -0.50]) * L
+        y = np.array([ 0.10,  0.95,  0.98,  0.98,  0.95,  0.10,  0.00,  0.00]) * H
+    elif tipo == "ciclista":
+        # Formato de ciclista/bike compacto
+        x = np.array([-0.40, -0.30, -0.15,  0.05,  0.25,  0.35,  0.25,  0.00, -0.25, -0.40]) * L
+        y = np.array([ 0.30,  0.70,  0.95,  0.85,  0.60,  0.25,  0.05,  0.05,  0.05,  0.30]) * H
+    else:  # Hatch / Sedan (Padrão)
+        x = np.array([-0.50, -0.47, -0.32, -0.12,  0.20,  0.38,  0.47,  0.50,  0.50, -0.50]) * L
+        y = np.array([ 0.15,  0.45,  0.52,  0.96,  0.94,  0.60,  0.30,  0.15,  0.00,  0.00]) * H
+        
+    return x, y
+
+# Callbacks para carregar dados dos presets
 def carregar_preset_a():
     sel = st.session_state.preset_select_a
     if sel in PRESETS_VEICULOS:
@@ -130,7 +157,7 @@ with col_direita:
     st.markdown("### 📐 Geometria do Veículo")
     
     with st.expander("🔵 **Objeto A (Referência)**", expanded=True):
-        st.selectbox("Modelo Base:", list(PRESETS_VEICULOS.keys()), key="preset_select_a", on_change=carregar_preset_a)
+        modelo_a = st.selectbox("Modelo Base:", list(PRESETS_VEICULOS.keys()), key="preset_select_a", on_change=carregar_preset_a)
         
         cd_a = st.slider("C_d (Coef. de Arrasto):", 0.15, 1.20, st.session_state.cd_a, 0.01, key="cd_a")
         area_a = st.slider("Área Frontal (m²):", 0.5, 10.0, st.session_state.area_a, 0.1, key="area_a")
@@ -148,7 +175,7 @@ with col_direita:
 
     if comparar:
         with st.expander("🔴 **Objeto B (Comparativo)**", expanded=False):
-            st.selectbox("Modelo Base:", list(PRESETS_VEICULOS.keys()), key="preset_select_b", on_change=carregar_preset_b)
+            modelo_b = st.selectbox("Modelo Base:", list(PRESETS_VEICULOS.keys()), key="preset_select_b", on_change=carregar_preset_b)
             
             cd_b = st.slider("C_d (Coef. de Arrasto):", 0.15, 1.20, st.session_state.cd_b, 0.01, key="cd_b")
             area_b = st.slider("Área Frontal (m²):", 0.5, 10.0, st.session_state.area_b, 0.1, key="area_b")
@@ -251,52 +278,49 @@ with col_centro:
         fig.update_layout(xaxis_title="Velocidade (km/h)", yaxis_title=title_y, template="plotly_white", height=400)
         st.plotly_chart(fig, use_container_width=True)
 
-    # TAB 2: TÚNEL DE VENTO COM PARTÍCULAS / MOLÉCULAS DE AR
+    # TAB 2: TÚNEL DE VENTO COM FORMAs REALISTAS E MOLÉCULAS DE AR
     with tab_desenho:
-        st.markdown("#### 🌀 Simulação de Moléculas de Ar Contornando o Veículo")
+        st.markdown("#### 🌀 Simulação de Moléculas de Ar Contornando a Forma Real do Veículo")
         
         fig_draw = go.Figure()
         
-        # 1. Geometria do Veículo
-        sharpness = max(0.05, 1.0 - (cd_a * 0.8))
-        height_geom = np.sqrt(area_a) / 2.0
+        # 1. Obter Silhueta Específica do Veículo
+        tipo_veiculo_a = PRESETS_VEICULOS[modelo_a]["tipo"]
+        altura_a = np.sqrt(area_a) * 0.95
         
-        x_body = np.linspace(-comprimento_a/2, comprimento_a/2, 100)
-        y_top = height_geom * (1 - (2 * x_body / comprimento_a)**2) ** sharpness
-        y_bottom = -y_top
+        x_carro, y_carro = gerar_silhueta_veiculo(tipo_veiculo_a, comprimento_a, altura_a)
         
-        # 2. Geração das Partículas / Moléculas de Ar
-        num_linhas = 22
-        pts_por_linha = 45
+        # 2. Simulação das Partículas / Moléculas de Ar
+        num_linhas = 24
+        pts_por_linha = 48
         
-        x_grid = np.linspace(-comprimento_a*1.2, comprimento_a*2.0, pts_por_linha)
-        y_iniciais = np.linspace(-height_geom*2.5, height_geom*2.5, num_linhas)
+        x_grid = np.linspace(-comprimento_a * 1.2, comprimento_a * 2.0, pts_por_linha)
+        y_iniciais = np.linspace(-altura_a * 0.3, altura_a * 2.6, num_linhas)
         
         px_list, py_list, vel_list = [], [], []
         
-        # Simulação aproximada de campo de escoamento potencial ao redor de um obstáculo
-        R_eff = height_geom * (1.1 + cd_a * 0.3)
+        # Fator de Perturbação Aerodinâmica
+        R_eff = altura_a * (0.8 + cd_a * 0.4)
         
         for y0 in y_iniciais:
-            if abs(y0) < 0.05:
-                y0 = 0.05  # Evita divisão por zero no centro exato
             for x in x_grid:
-                r2 = x**2 + y0**2
-                # Fator de desvio baseado na proximidade do corpo
-                factor = 1.0 + (R_eff**2) / max(r2, R_eff**2 * 0.5)
+                # Distância e desvio vertical em relação ao formato real
+                r2 = x**2 + (y0 - altura_a*0.5)**2
                 
-                # Deslocamento vertical das partículas contornando o carro
-                dy = (R_eff**2 * y0) / max(r2, R_eff**2) * np.exp(-(x / (comprimento_a*0.8))**2)
-                y_part = y0 + dy
+                # Moléculas contornam por cima do teto e capô
+                dy = (R_eff**2 * max(0.1, y0)) / max(r2, R_eff**1.8) * np.exp(-((x + comprimento_a*0.1) / (comprimento_a*0.7))**2)
                 
-                # Desaceleração na frente/trás (ponto de estagnação) e aceleração nas laterais
-                v_relativa = v_efetiva_ms * (1.0 - (R_eff**2 * (x**2 - y0**2)) / max(r2**2, R_eff**4))
+                # Impedir que moléculas atravessem o chão
+                y_part = max(0.02, y0 + dy)
+                
+                # Aceleração/Desaceleração do ar (Ponto de Estagnação na Frente e Vácuo Traseiro)
+                v_relativa = v_efetiva_ms * (1.0 - (R_eff**2 * (x**2 - (y0-altura_a*0.5)**2)) / max(r2**2, R_eff**3.5))
                 
                 px_list.append(x)
                 py_list.append(y_part)
-                vel_list.append(abs(v_relativa) * 3.6)  # km/h
-        
-        # Desenhar as Moléculas de Ar (Coloridas pela Velocidade)
+                vel_list.append(abs(v_relativa) * 3.6)
+
+        # Desenhar Moléculas de Ar
         fig_draw.add_trace(go.Scatter(
             x=px_list, y=py_list,
             mode='markers',
@@ -310,36 +334,52 @@ with col_centro:
             name='Moléculas de Ar'
         ))
 
-        # Desenhar o Corpo do Veículo por Cima das Partículas
+        # Desenhar a Lataria / Silhueta do Veículo
         fig_draw.add_trace(go.Scatter(
-            x=np.concatenate([x_body, x_body[::-1]]),
-            y=np.concatenate([y_top, y_bottom[::-1]]),
-            fill='toself', fillcolor='rgba(20, 20, 25, 0.95)',
-            line=dict(color='#00D2FF', width=3), name='Objeto A'
+            x=x_carro, y=y_carro,
+            fill='toself', fillcolor='rgba(25, 28, 36, 0.95)',
+            line=dict(color='#00D2FF', width=3), name='Veículo A'
+        ))
+
+        # Adicionar Rodas para Aumentar o Reconhecimento Visual
+        r_raio = altura_a * 0.22
+        x_roda_front = -comprimento_a * 0.3
+        x_roda_tras = comprimento_a * 0.3
+        
+        theta = np.linspace(0, 2*np.pi, 20)
+        # Roda Traseira
+        fig_draw.add_trace(go.Scatter(
+            x=x_roda_tras + r_raio*np.cos(theta), y=r_raio + r_raio*np.sin(theta),
+            fill='toself', fillcolor='#111', line=dict(color='#555', width=2), showlegend=False
+        ))
+        # Roda Dianteira
+        fig_draw.add_trace(go.Scatter(
+            x=x_roda_front + r_raio*np.cos(theta), y=r_raio + r_raio*np.sin(theta),
+            fill='toself', fillcolor='#111', line=dict(color='#555', width=2), showlegend=False
         ))
 
         # Aerofólio (se ativado)
         if usar_aerofolio:
-            x_asa = comprimento_a/2.5
-            y_asa = height_geom + 0.3
+            x_asa = comprimento_a * 0.38
+            y_asa = altura_a * 0.75
             fig_draw.add_trace(go.Scatter(
-                x=[x_asa - 0.3, x_asa + 0.3], y=[y_asa, y_asa + 0.1],
+                x=[x_asa - 0.25, x_asa + 0.25], y=[y_asa, y_asa + 0.1],
                 mode='lines', line=dict(color='#FFD700', width=6), name='Aerofólio'
             ))
 
-        # Seta do Vetor de Arrasto
+        # Vetor da Força de Arrasto (Seta Vermelha)
         vec_scale = 0.002
         fig_draw.add_annotation(
-            x=comprimento_a/2 + (fd_a * vec_scale), y=0, ax=comprimento_a/2, ay=0,
+            x=comprimento_a/2 + (fd_a * vec_scale), y=altura_a*0.5, ax=comprimento_a/2, ay=altura_a*0.5,
             xref="x", yref="y", axref="x", ayref="y",
             showarrow=True, arrowhead=3, arrowsize=1.5, arrowwidth=3, arrowcolor="#FF2A6D",
             text=f"Fd = {fd_a:.0f} N"
         )
 
         fig_draw.update_layout(
-            template="plotly_dark", height=420,
-            xaxis=dict(range=[-comprimento_a*1.2, comprimento_a*2.0], title="Comprimento (m)"),
-            yaxis=dict(range=[-height_geom*2.8, height_geom*2.8], title="Altura (m)"),
+            template="plotly_dark", height=450,
+            xaxis=dict(range=[-comprimento_a*1.1, comprimento_a*1.8], title="Comprimento (m)"),
+            yaxis=dict(range=[-0.1, altura_a*2.2], title="Altura (m)"),
             showlegend=False
         )
         st.plotly_chart(fig_draw, use_container_width=True)
