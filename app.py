@@ -58,8 +58,7 @@ VEICULOS_PRESETS = {
     }
 }
 
-# Funções auxiliares para renderizar a animação JS/Canvas
-def gerar_canvas_js(id_canvas, v_ms, cd, shape_type, titulo_label, cor_veiculo="#F43F5E"):
+def gerar_canvas_js(id_canvas, v_ms, cd, shape_type, titulo_label, cor_veiculo="#0284C7"):
     return f"""
     <div style="text-align: center; background-color: #0F172A; padding: 8px; border-radius: 10px; margin-bottom: 12px;">
         <div style="color: #F8FAFC; font-weight: bold; font-family: sans-serif; font-size: 0.85rem; margin-bottom: 4px; text-align: left; padding-left: 5px;">
@@ -243,7 +242,6 @@ with col_centro:
     st.markdown('<p class="title-text">⚡ Simulador de Aerodinâmica & Arrasto Fluido</p>', unsafe_allow_html=True)
     st.markdown('<p class="subtitle-text">Análise telemétrica de forças dinâmicas com base em modelos reais e condições atmosféricas.</p>', unsafe_allow_html=True)
     
-    # Exibição de Métricas em Destaque
     m1, m2, m3 = st.columns(3)
     m1.metric("Força de Arrasto (Fd)", f"{fd_a:.1f} N")
     m2.metric("Potência Exigida", f"{pot_cv_a:.1f} CV", f"{pot_w_a/1000:.1f} kW")
@@ -251,7 +249,6 @@ with col_centro:
     
     st.write("---")
     
-    # ORGANIZAÇÃO DAS ABAS: GRÁFICO PRINCIPAL EM 1º LUGAR
     tab_fd, tab_pot, tab_anim = st.tabs([
         "📈 Força de Arrasto (Gráfico Principal)", 
         "⚡ Potência Requerida (CV)",
@@ -269,7 +266,6 @@ with col_centro:
         
         fig_fd = go.Figure()
         
-        # Curva do Veículo A com Sombreamento
         fig_fd.add_trace(go.Scatter(
             x=v_vetor_kmh, y=fd_vetor_a,
             mode='lines',
@@ -396,11 +392,9 @@ with col_centro:
     with tab_anim:
         st.markdown("##### Visualização das Partículas de Vento no Túnel de Aerodinâmica")
         
-        # Renderiza o Túnel de Vento do Veículo A
         html_code_a = gerar_canvas_js("canvas_a", v_ms, cd_a, tipo_anim_a, f"🔵 Veículo A: {veiculo_a}", "#0284C7")
         
         if comparar:
-            # Renderiza o segundo Túnel de Vento empilhado em cima/abaixo do outro quando o botão de comparação é acionado
             html_code_b = gerar_canvas_js("canvas_b", v_ms, cd_b, tipo_anim_b, f"🔴 Veículo B: {veiculo_b}", "#E11D48")
             html_combinado = html_code_a + html_code_b
             components.html(html_combinado, height=530)
