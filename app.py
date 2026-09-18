@@ -183,8 +183,8 @@ pot_cv_a = pot_watts_a / 735.5
 downforce_a = 0.5 * rho * (v_efetiva_ms ** 2) * cl_a * area_asa_a
 
 consumo_l_h_a = (pot_watts_a / eficiencia_motor) / (32e6 / 3600) if v_kmh > 0 else 0
-consumo_100km_a = (consumo_l_h_a / v_kmh) * 100 if v_kmh > 0 else 0
-custo_100km_a = consumo_100km_a * preco_comb
+consumo_1km_a = (consumo_l_h_a / v_kmh) if v_kmh > 0 else 0
+custo_1km_a = consumo_1km_a * preco_comb
 
 # Objeto B (se ativo)
 if comparar:
@@ -194,8 +194,8 @@ if comparar:
     pot_watts_b = f_total_b * v_propria_ms
     pot_cv_b = pot_watts_b / 735.5
     consumo_l_h_b = (pot_watts_b / eficiencia_motor) / (32e6 / 3600) if v_kmh > 0 else 0
-    consumo_100km_b = (consumo_l_h_b / v_kmh) * 100 if v_kmh > 0 else 0
-    custo_100km_b = consumo_100km_b * preco_comb
+    consumo_1km_b = (consumo_l_h_b / v_kmh) if v_kmh > 0 else 0
+    custo_1km_b = consumo_1km_b * preco_comb
 
 # ==========================================
 # DASHBOARD PRINCIPAL
@@ -206,8 +206,8 @@ with col_centro:
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Força de Arrasto (Fd)", f"{fd_a:.1f} N")
     m2.metric("Potência Exigida", f"{pot_cv_a:.1f} CV")
-    m3.metric("Consumo Estimado", f"{consumo_100km_a:.2f} L/100km")
-    m4.metric("Custo p/ 100 km", f"R$ {custo_100km_a:.2f}")
+    m3.metric("Consumo Estimado", f"{consumo_1km_a * 100:.2f} L/100km")
+    m4.metric("Custo p/ 1 km", f"R$ {custo_1km_a:.2f}")
 
     st.write("---")
     
@@ -219,7 +219,7 @@ with col_centro:
 
     # TAB 1: CURVAS DE DESEMPENHO
     with tab_grafico:
-        opcao_grafico = st.radio("Métrica a exibir:", ["Força de Arrasto (N)", "Potência Necessária (CV)", "Custo (R$/100km)"], horizontal=True)
+        opcao_grafico = st.radio("Métrica a exibir:", ["Força de Arrasto (N)", "Potência Necessária (CV)", "Custo (R$/km)"], horizontal=True)
         
         v_vec = np.linspace(10, 220, 100)
         v_vec_ef = np.maximum(0.1, v_vec + v_vento_kmh) / 3.6
@@ -228,14 +228,14 @@ with col_centro:
         fd_vec_a = (0.5 * rho * (v_vec_ef ** 2) * cd_a * area_a) + (0.5 * rho * (v_vec_ef ** 2) * cd_induzido_asa_a * area_asa_a if usar_aerofolio else 0.0)
         f_tot_vec_a = fd_vec_a + f_rol_a
         pot_vec_cv_a = (f_tot_vec_a * v_vec_ms) / 735.5
-        cons_vec_a = (((f_tot_vec_a * v_vec_ms) / eficiencia_motor) / (32e6 / 3600) / np.maximum(1.0, v_vec)) * 100 * preco_comb
+        cons_vec_a = (((f_tot_vec_a * v_vec_ms) / eficiencia_motor) / (32e6 / 3600) / np.maximum(1.0, v_vec)) * preco_comb
 
         if opcao_grafico == "Força de Arrasto (N)":
             y_a, y_p_a, title_y = fd_vec_a, fd_a, "Força de Arrasto (N)"
         elif opcao_grafico == "Potência Necessária (CV)":
             y_a, y_p_a, title_y = pot_vec_cv_a, pot_cv_a, "Potência Requerida (CV)"
         else:
-            y_a, y_p_a, title_y = cons_vec_a, custo_100km_a, "Custo R$ / 100km"
+            y_a, y_p_a, title_y = cons_vec_a, custo_1km_a, "Custo (R$ / km)"
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=v_vec, y=y_a, mode='lines', name='Objeto A', line=dict(color='#00D2FF', width=3)))
@@ -245,10 +245,10 @@ with col_centro:
             fd_vec_b = 0.5 * rho * (v_vec_ef ** 2) * cd_b * area_b
             f_tot_vec_b = fd_vec_b + f_rol_b
             pot_vec_cv_b = (f_tot_vec_b * v_vec_ms) / 735.5
-            cons_vec_b = (((f_tot_vec_b * v_vec_ms) / eficiencia_motor) / (32e6 / 3600) / np.maximum(1.0, v_vec)) * 100 * preco_comb
+            cons_vec_b = (((f_tot_vec_b * v_vec_ms) / eficiencia_motor) / (32e6 / 3600) / np.maximum(1.0, v_vec)) * preco_comb
 
             y_b = fd_vec_b if opcao_grafico == "Força de Arrasto (N)" else (pot_vec_cv_b if opcao_grafico == "Potência Necessária (CV)" else cons_vec_b)
-            y_p_b = fd_b if opcao_grafico == "Força de Arrasto (N)" else (pot_cv_b if opcao_grafico == "Potência Necessária (CV)" else custo_100km_b)
+            y_p_b = fd_b if opcao_grafico == "Força de Arrasto (N)" else (pot_cv_b if opcao_grafico == "Potência Necessária (CV)" else custo_1km_b)
 
             fig.add_trace(go.Scatter(x=v_vec, y=y_b, mode='lines', name='Objeto B', line=dict(color='#FF2A6D', width=3)))
             fig.add_trace(go.Scatter(x=[v_kmh], y=[y_p_b], mode='markers', name='Ponto Atual B', marker=dict(color='#FF2A6D', size=10)))
