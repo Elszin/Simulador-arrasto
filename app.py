@@ -43,25 +43,28 @@ CIDADES_ALTITUDE = {
     "La Paz - Bolívia (~3640 m)": 3640
 }
 
-# FUNÇÃO PARA GERAR A SILHUETA MÁTRICA DE CADA MODELO DE VEÍCULO
+# ==========================================
+# FUNÇÃO SILHUETA (CORRIGIDA: FRENTE VIRADA PARA A ESQUERDA -X)
+# ==========================================
 def gerar_silhueta_veiculo(tipo, comprimento, altura):
     L = comprimento
     H = altura
     
+    # Invertemos os pontos no eixo X (-1 *) para que a frente do veículo fique voltada para a ESQUERDA
     if tipo == "esportivo":
-        x = np.array([-0.50, -0.48, -0.35, -0.10,  0.15,  0.40,  0.48,  0.50,  0.50, -0.50]) * L
+        x = -1 * np.array([-0.50, -0.48, -0.35, -0.10,  0.15,  0.40,  0.48,  0.50,  0.50, -0.50]) * L
         y = np.array([ 0.15,  0.30,  0.40,  0.95,  0.85,  0.50,  0.35,  0.15,  0.00,  0.00]) * H
     elif tipo == "suv":
-        x = np.array([-0.50, -0.48, -0.38, -0.18,  0.25,  0.45,  0.48,  0.50,  0.50, -0.50]) * L
+        x = -1 * np.array([-0.50, -0.48, -0.38, -0.18,  0.25,  0.45,  0.48,  0.50,  0.50, -0.50]) * L
         y = np.array([ 0.15,  0.55,  0.60,  0.98,  0.98,  0.90,  0.35,  0.15,  0.00,  0.00]) * H
     elif tipo == "caminhao":
-        x = np.array([-0.50, -0.49, -0.48,  0.48,  0.49,  0.50,  0.50, -0.50]) * L
+        x = -1 * np.array([-0.50, -0.49, -0.48,  0.48,  0.49,  0.50,  0.50, -0.50]) * L
         y = np.array([ 0.10,  0.95,  0.98,  0.98,  0.95,  0.10,  0.00,  0.00]) * H
     elif tipo == "ciclista":
-        x = np.array([-0.40, -0.30, -0.15,  0.05,  0.25,  0.35,  0.25,  0.00, -0.25, -0.40]) * L
+        x = -1 * np.array([-0.40, -0.30, -0.15,  0.05,  0.25,  0.35,  0.25,  0.00, -0.25, -0.40]) * L
         y = np.array([ 0.30,  0.70,  0.95,  0.85,  0.60,  0.25,  0.05,  0.05,  0.05,  0.30]) * H
     else:  # Hatch / Sedan
-        x = np.array([-0.50, -0.47, -0.32, -0.12,  0.20,  0.38,  0.47,  0.50,  0.50, -0.50]) * L
+        x = -1 * np.array([-0.50, -0.47, -0.32, -0.12,  0.20,  0.38,  0.47,  0.50,  0.50, -0.50]) * L
         y = np.array([ 0.15,  0.45,  0.52,  0.96,  0.94,  0.60,  0.30,  0.15,  0.00,  0.00]) * H
         
     return x, y
@@ -271,7 +274,7 @@ with col_centro:
         fig.update_layout(xaxis_title="Velocidade (km/h)", yaxis_title=title_y, template="plotly_white", height=400)
         st.plotly_chart(fig, use_container_width=True)
 
-    # TAB 2: TÚNEL DE VENTO (VENTO CORRETO: DIREITA PARA A ESQUERDA)
+    # TAB 2: TÚNEL DE VENTO (CORRIGIDO: VENTO DA ESQUERDA PARA A DIREITA)
     with tab_desenho:
         st.markdown("#### 🌀 Fluxo de Ar no Túnel de Vento")
         st.caption(f"🌡️ **{temp_c}°C** ($\rho$: **{rho:.3f} kg/m³**) | 💨 Fluxo Frontal: **{v_efetiva_ms*3.6:.1f} km/h** | Clique em **Play ▶️** para ativar o fluxo!")
@@ -280,8 +283,8 @@ with col_centro:
         altura_a = np.sqrt(area_a) * 0.95
         x_carro, y_carro = gerar_silhueta_veiculo(tipo_veiculo_a, comprimento_a, altura_a)
         
-        # O carro está virado para a DIREITA (+X)
-        x_asa_pos = -comprimento_a * 0.38
+        # Posição corrigida do Aerofólio (Traseira fica no lado DIREITO +X)
+        x_asa_pos = comprimento_a * 0.38
         y_asa_pos = altura_a * 0.82
         
         num_linhas = 12
@@ -294,17 +297,17 @@ with col_centro:
         y_iniciais = np.linspace(-altura_a * 0.3, altura_a * 2.5, num_linhas)
         R_eff = altura_a * (0.8 + cd_a * 0.4)
 
-        # Cálculo do campo com sentido de fluxo invertido (Direita -> Esquerda)
+        # Cálculo do campo com fluxo da Esquerda -> Direita (-X -> +X)
         def calcular_particulas(offset):
             px_l, py_l, vel_l, sz_l = [], [], [], []
             for y0 in y_iniciais:
                 for x_raw in x_grid_base:
-                    # O offset subtrai para andar da Direita para a Esquerda (+X -> -X)
-                    x = x_max - ((x_max - x_raw + offset) % largura_grid)
+                    # O offset soma para mover do lado esquerdo para o lado direito
+                    x = x_min + ((x_raw - x_min + offset) % largura_grid)
                     
                     r2_carro = x**2 + (y0 - altura_a*0.5)**2
-                    # Desvio aerodinâmico corrigido na dianteira
-                    dy_carro = (R_eff**2 * max(0.1, y0)) / max(r2_carro, R_eff**1.8) * np.exp(-((x - comprimento_a*0.1) / (comprimento_a*0.7))**2)
+                    # Desvio aerodinâmico focado no capô (lado esquerdo -0.1*comprimento)
+                    dy_carro = (R_eff**2 * max(0.1, y0)) / max(r2_carro, R_eff**1.8) * np.exp(-((x + comprimento_a*0.1) / (comprimento_a*0.7))**2)
                     
                     dy_asa = 0.0
                     v_boost_asa = 0.0
@@ -352,10 +355,10 @@ with col_centro:
             line=dict(color='#00D2FF', width=3), name='Veículo A'
         ))
 
-        # Rodas
+        # Rodas (Frente na Esquerda, Traseira na Direita)
         r_raio = altura_a * 0.22
-        x_roda_front = comprimento_a * 0.3
-        x_roda_tras = -comprimento_a * 0.3
+        x_roda_front = -comprimento_a * 0.3
+        x_roda_tras = comprimento_a * 0.3
         theta = np.linspace(0, 2*np.pi, 20)
 
         fig_tunel.add_trace(go.Scatter(
@@ -367,7 +370,7 @@ with col_centro:
             fill='toself', fillcolor='#111', line=dict(color='#555', width=2), showlegend=False
         ))
 
-        # Aerofólio
+        # Aerofólio (Ajustado para a Traseira em +X)
         if usar_aerofolio:
             fig_tunel.add_trace(go.Scatter(
                 x=[x_asa_pos, x_asa_pos], y=[y_asa_pos - 0.15*altura_a, y_asa_pos],
@@ -375,16 +378,16 @@ with col_centro:
             ))
             ang = 0.15 + (cl_a * 0.08)
             x_asa_line = [x_asa_pos - 0.2*comprimento_a*0.2, x_asa_pos + 0.2*comprimento_a*0.2]
-            y_asa_line = [y_asa_pos + 0.1*altura_a*ang, y_asa_pos - 0.1*altura_a*ang]
+            y_asa_line = [y_asa_pos - 0.1*altura_a*ang, y_asa_pos + 0.1*altura_a*ang]
             fig_tunel.add_trace(go.Scatter(
                 x=x_asa_line, y=y_asa_line,
                 mode='lines', line=dict(color='#FFD700', width=6), name='Aerofólio'
             ))
 
-        # Vetor de Arrasto empurrando para a ESQUERDA
+        # Vetor de Arrasto empurrando para a DIREITA (mesma direção do vento)
         vec_scale = 0.002
         fig_tunel.add_annotation(
-            x=-comprimento_a/2 - (fd_a * vec_scale), y=altura_a*0.5, ax=-comprimento_a/2, ay=altura_a*0.5,
+            x=comprimento_a/2 + (fd_a * vec_scale), y=altura_a*0.5, ax=comprimento_a/2, ay=altura_a*0.5,
             xref="x", yref="y", axref="x", ayref="y",
             showarrow=True, arrowhead=3, arrowsize=1.5, arrowwidth=3, arrowcolor="#FF2A6D",
             text=f"Fd = {fd_a:.0f} N"
