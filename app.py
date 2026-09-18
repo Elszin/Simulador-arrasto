@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import numpy as np
 import pandas as pd
+import time
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA
@@ -86,6 +87,12 @@ def carregar_preset_b():
         st.session_state.p_b = float(p["potencia_cv"])
         st.session_state.comp_b = float(p["comprimento"])
 
+# Initializer do Estado de Animação
+if "animando" not in st.session_state:
+    st.session_state.animando = False
+if "fase_anim" not in st.session_state:
+    st.session_state.fase_anim = 0.0
+
 # ==========================================
 # BARRA LATERAL: PARÂMETROS AMBIENTAIS & OPERAÇÃO
 # ==========================================
@@ -105,7 +112,7 @@ with st.sidebar:
     
     temp_c = st.slider("Temperatura do Ar (°C)", -10, 50, 20, 1, key="slider_temp")
     
-    # Cálculo da densidade do ar (Ideal Gas Law)
+    # Cálculo da densidade do ar
     temp_k = temp_c + 273.15
     p_atm = 101325 * np.exp(-altitude / 8500)
     rho = p_atm / (287.058 * temp_k)
@@ -273,110 +280,147 @@ with col_centro:
         fig.update_layout(xaxis_title="Velocidade (km/h)", yaxis_title=title_y, template="plotly_white", height=400)
         st.plotly_chart(fig, use_container_width=True)
 
-    # TAB 2: TÚNEL DE VENTO COM DENSIDADE E ENERGIA CINÉTICA DAS MOLÉCULAS
+    # TAB 2: TÚNEL DE VENTO COM ANIMAÇÃO DE FLUXO E AEROFOIL INTERATIVO
     with tab_desenho:
-        st.markdown("#### 🌀 Densidade de Moléculas (Temperatura) e Energia de Impacto (Velocidade)")
-        st.caption(f"🌡️ **{temp_c}°C** → Densidade de Moléculas: **{rho:.3f} kg/m³** | 💨 Velocidade do Fluxo: **{v_efetiva_ms*3.6:.1f} km/h**")
+        col_head, col_btn = st.columns([3, 1])
+        with col_head:
+            st.markdown("#### 🌀 Fluxo Contínuo de Moléculas no Túnel de Vento")
+            st.caption(f"🌡️ **{temp_c}°C** ($\rho$: **{rho:.3f} kg/m³**) | 💨 Fluxo: **{v_efetiva_ms*3.6:.1f} km/h**")
+        with col_btn:
+            if st.button("▶️ Alternar Animação" if not st.session_state.animando else "⏸️ Pausar Animação"):
+                st.session_state.animando = not st.session_state.animando
         
-        fig_draw = go.Figure()
-        
-        # 1. Silhueta do Veículo
-        tipo_veiculo_a = PRESETS_VEICULOS[modelo_a]["tipo"]
-        altura_a = np.sqrt(area_a) * 0.95
-        x_carro, y_carro = gerar_silhueta_veiculo(tipo_veiculo_a, comprimento_a, altura_a)
-        
-        # 2. Densidade de Moléculas proporcional à Temperatura (Densidade do Ar rho)
-        # Se rho for maior (frio/mar), geramos mais linhas de partículas. Se menor (quente/alto), geramos menos.
-        num_linhas = int(np.clip(14 + (rho - 0.8) * 20, 10, 30))
-        pts_por_linha = 45
-        
-        x_grid = np.linspace(-comprimento_a * 1.2, comprimento_a * 2.0, pts_por_linha)
-        y_iniciais = np.linspace(-altura_a * 0.3, altura_a * 2.6, num_linhas)
-        
-        px_list, py_list, vel_list, size_list = [], [], [], []
-        
-        R_eff = altura_a * (0.8 + cd_a * 0.4)
-        
-        for y0 in y_iniciais:
-            for x in x_grid:
-                r2 = x**2 + (y0 - altura_a*0.5)**2
-                
-                # Desvio de trajetória contornando a forma do carro
-                dy = (R_eff**2 * max(0.1, y0)) / max(r2, R_eff**1.8) * np.exp(-((x + comprimento_a*0.1) / (comprimento_a*0.7))**2)
-                y_part = max(0.02, y0 + dy)
-                
-                # Variação da velocidade local em m/s
-                v_relativa = v_efetiva_ms * (1.0 - (R_eff**2 * (x**2 - (y0-altura_a*0.5)**2)) / max(r2**2, R_eff**3.5))
-                
-                px_list.append(x)
-                py_list.append(y_part)
-                vel_list.append(abs(v_relativa) * 3.6)
-                
-                # Tamanho das partículas varia com a energia de impacto (velocidade + densidade)
-                p_size = 4 + (abs(v_relativa) / 10.0)
-                size_list.append(p_size)
+        container_grafico = st.empty()
 
-        # Desenhar Moléculas de Ar
-        fig_draw.add_trace(go.Scatter(
-            x=px_list, y=py_list,
-            mode='markers',
-            marker=dict(
-                size=size_list,
-                color=vel_list,
-                colorscale='Turbo',
-                showscale=True,
-                colorbar=dict(title="Velocidade (km/h)", len=0.8)
-            ),
-            name='Moléculas de Ar'
-        ))
+        def desenhar_tunel(offset_x=0.0):
+            fig_draw = go.Figure()
+            
+            tipo_veiculo_a = PRESETS_VEICULOS[modelo_a]["tipo"]
+            altura_a = np.sqrt(area_a) * 0.95
+            x_carro, y_carro = gerar_silhueta_veiculo(tipo_veiculo_a, comprimento_a, altura_a)
+            
+            x_asa_pos = comprimento_a * 0.38
+            y_asa_pos = altura_a * 0.82
+            
+            num_linhas = int(np.clip(14 + (rho - 0.8) * 20, 10, 30))
+            pts_por_linha = 48
+            
+            # Grid que se move para a direita (efeito contínuo)
+            x_min, x_max = -comprimento_a * 1.2, comprimento_a * 2.0
+            largura_grid = x_max - x_min
+            
+            x_grid_base = np.linspace(x_min, x_max, pts_por_linha)
+            y_iniciais = np.linspace(-altura_a * 0.3, altura_a * 2.6, num_linhas)
+            
+            px_list, py_list, vel_list, size_list = [], [], [], []
+            R_eff = altura_a * (0.8 + cd_a * 0.4)
+            
+            for y0 in y_iniciais:
+                for x_raw in x_grid_base:
+                    # Deslocamento animado com módulo para repetir o fluxo
+                    x = x_min + ((x_raw - x_min + offset_x) % largura_grid)
+                    
+                    r2_carro = x**2 + (y0 - altura_a*0.5)**2
+                    dy_carro = (R_eff**2 * max(0.1, y0)) / max(r2_carro, R_eff**1.8) * np.exp(-((x + comprimento_a*0.1) / (comprimento_a*0.7))**2)
+                    
+                    dy_asa = 0.0
+                    v_boost_asa = 0.0
+                    
+                    if usar_aerofolio:
+                        dist_asa_sq = (x - x_asa_pos)**2 + (y0 - y_asa_pos)**2
+                        fator_alcance = np.exp(-dist_asa_sq / (0.35 * comprimento_a))
+                        dy_asa = (cl_a * 0.45) * fator_alcance
+                        v_boost_asa = (cl_a * 35.0) * fator_alcance
 
-        # Desenhar Silhueta do Veículo
-        fig_draw.add_trace(go.Scatter(
-            x=x_carro, y=y_carro,
-            fill='toself', fillcolor='rgba(25, 28, 36, 0.95)',
-            line=dict(color='#00D2FF', width=3), name='Veículo A'
-        ))
+                    y_part = max(0.02, y0 + dy_carro + dy_asa)
+                    
+                    v_relativa = v_efetiva_ms * (1.0 - (R_eff**2 * (x**2 - (y0-altura_a*0.5)**2)) / max(r2_carro**2, R_eff**3.5))
+                    v_local_total = abs(v_relativa) * 3.6 + v_boost_asa
+                    
+                    px_list.append(x)
+                    py_list.append(y_part)
+                    vel_list.append(v_local_total)
+                    size_list.append(4 + (v_local_total / 12.0))
 
-        # Rodas
-        r_raio = altura_a * 0.22
-        x_roda_front = -comprimento_a * 0.3
-        x_roda_tras = comprimento_a * 0.3
-        theta = np.linspace(0, 2*np.pi, 20)
-        
-        fig_draw.add_trace(go.Scatter(
-            x=x_roda_tras + r_raio*np.cos(theta), y=r_raio + r_raio*np.sin(theta),
-            fill='toself', fillcolor='#111', line=dict(color='#555', width=2), showlegend=False
-        ))
-        fig_draw.add_trace(go.Scatter(
-            x=x_roda_front + r_raio*np.cos(theta), y=r_raio + r_raio*np.sin(theta),
-            fill='toself', fillcolor='#111', line=dict(color='#555', width=2), showlegend=False
-        ))
-
-        # Aerofólio (se ativado)
-        if usar_aerofolio:
-            x_asa = comprimento_a * 0.38
-            y_asa = altura_a * 0.75
+            # Desenhar Moléculas de Ar
             fig_draw.add_trace(go.Scatter(
-                x=[x_asa - 0.25, x_asa + 0.25], y=[y_asa, y_asa + 0.1],
-                mode='lines', line=dict(color='#FFD700', width=6), name='Aerofólio'
+                x=px_list, y=py_list,
+                mode='markers',
+                marker=dict(
+                    size=size_list,
+                    color=vel_list,
+                    colorscale='Turbo',
+                    showscale=True,
+                    colorbar=dict(title="Velocidade (km/h)", len=0.8)
+                ),
+                name='Moléculas de Ar'
             ))
 
-        # Vetor de Arrasto
-        vec_scale = 0.002
-        fig_draw.add_annotation(
-            x=comprimento_a/2 + (fd_a * vec_scale), y=altura_a*0.5, ax=comprimento_a/2, ay=altura_a*0.5,
-            xref="x", yref="y", axref="x", ayref="y",
-            showarrow=True, arrowhead=3, arrowsize=1.5, arrowwidth=3, arrowcolor="#FF2A6D",
-            text=f"Fd = {fd_a:.0f} N"
-        )
+            # Desenhar Silhueta do Veículo
+            fig_draw.add_trace(go.Scatter(
+                x=x_carro, y=y_carro,
+                fill='toself', fillcolor='rgba(25, 28, 36, 0.95)',
+                line=dict(color='#00D2FF', width=3), name='Veículo A'
+            ))
 
-        fig_draw.update_layout(
-            template="plotly_dark", height=450,
-            xaxis=dict(range=[-comprimento_a*1.1, comprimento_a*1.8], title="Comprimento (m)"),
-            yaxis=dict(range=[-0.1, altura_a*2.2], title="Altura (m)"),
-            showlegend=False
-        )
-        st.plotly_chart(fig_draw, use_container_width=True)
+            # Rodas
+            r_raio = altura_a * 0.22
+            x_roda_front = -comprimento_a * 0.3
+            x_roda_tras = comprimento_a * 0.3
+            theta = np.linspace(0, 2*np.pi, 20)
+            
+            fig_draw.add_trace(go.Scatter(
+                x=x_roda_tras + r_raio*np.cos(theta), y=r_raio + r_raio*np.sin(theta),
+                fill='toself', fillcolor='#111', line=dict(color='#555', width=2), showlegend=False
+            ))
+            fig_draw.add_trace(go.Scatter(
+                x=x_roda_front + r_raio*np.cos(theta), y=r_raio + r_raio*np.sin(theta),
+                fill='toself', fillcolor='#111', line=dict(color='#555', width=2), showlegend=False
+            ))
+
+            # Aerofólio (se ativado)
+            if usar_aerofolio:
+                fig_draw.add_trace(go.Scatter(
+                    x=[x_asa_pos, x_asa_pos], y=[y_asa_pos - 0.15*altura_a, y_asa_pos],
+                    mode='lines', line=dict(color='#888', width=3), showlegend=False
+                ))
+                ang = 0.15 + (cl_a * 0.08)
+                x_asa_line = [x_asa_pos - 0.2*comprimento_a*0.2, x_asa_pos + 0.2*comprimento_a*0.2]
+                y_asa_line = [y_asa_pos - 0.1*altura_a*ang, y_asa_pos + 0.1*altura_a*ang]
+                fig_draw.add_trace(go.Scatter(
+                    x=x_asa_line, y=y_asa_line,
+                    mode='lines', line=dict(color='#FFD700', width=6), name='Aerofólio'
+                ))
+
+            # Vetor de Arrasto
+            vec_scale = 0.002
+            fig_draw.add_annotation(
+                x=comprimento_a/2 + (fd_a * vec_scale), y=altura_a*0.5, ax=comprimento_a/2, ay=altura_a*0.5,
+                xref="x", yref="y", axref="x", ayref="y",
+                showarrow=True, arrowhead=3, arrowsize=1.5, arrowwidth=3, arrowcolor="#FF2A6D",
+                text=f"Fd = {fd_a:.0f} N"
+            )
+
+            fig_draw.update_layout(
+                template="plotly_dark", height=450,
+                xaxis=dict(range=[-comprimento_a*1.1, comprimento_a*1.8], title="Comprimento (m)"),
+                yaxis=dict(range=[-0.1, altura_a*2.2], title="Altura (m)"),
+                showlegend=False
+            )
+            return fig_draw
+
+        # Renderização com Animação Continuada
+        if st.session_state.animando:
+            # Passo proporcional à velocidade configurada
+            passo = max(0.1, v_efetiva_ms * 0.02)
+            st.session_state.fase_anim += passo
+            fig_frame = desenhar_tunel(st.session_state.fase_anim)
+            container_grafico.plotly_chart(fig_frame, use_container_width=True)
+            time.sleep(0.04)
+            st.rerun()
+        else:
+            fig_estatico = desenhar_tunel(st.session_state.fase_anim)
+            container_grafico.plotly_chart(fig_estatico, use_container_width=True)
 
     # TAB 3: DIVISÃO DE RESISTÊNCIAS
     with tab_pie:
