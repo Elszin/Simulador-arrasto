@@ -36,13 +36,14 @@ PRESETS_VEICULOS = {
 }
 
 CIDADES_ALTITUDE = {
+    "Personalizado": None,
     "Nível do Mar (0 m)": 0,
     "São Paulo / Curitiba (~800 m)": 800,
     "Cidade do México (~2240 m)": 2240,
     "La Paz - Bolívia (~3640 m)": 3640
 }
 
-# Callbacks para carregar dados dos presets
+# Callbacks para carregar dados dos presets de veículos
 def carregar_preset_a():
     sel = st.session_state.preset_select_a
     if sel in PRESETS_VEICULOS:
@@ -72,8 +73,16 @@ with st.sidebar:
     
     st.markdown("**🏔️ Altitude & Atmosfera**")
     cidade_preset = st.selectbox("Presets de Altitude:", list(CIDADES_ALTITUDE.keys()), index=0, key="select_cidade_alt")
-    val_alt = CIDADES_ALTITUDE[cidade_preset]
-    altitude = st.slider("Altitude (m)", 0, 5000, val_alt, 100, key="slider_altitude")
+    
+    # Lógica do modo personalizado vs preset fixo
+    is_custom = (cidade_preset == "Personalizado")
+    
+    if not is_custom:
+        val_alt = CIDADES_ALTITUDE[cidade_preset]
+        altitude = st.slider("Altitude (m)", 0, 5000, val_alt, 100, disabled=True, key="slider_altitude_preset")
+    else:
+        altitude = st.slider("Altitude Personalizada (m)", 0, 5000, 0, 100, disabled=False, key="slider_altitude_custom")
+    
     temp_c = st.slider("Temperatura do Ar (°C)", -10, 50, 20, 1, key="slider_temp")
     
     # Cálculo físico da densidade do ar em função da altitude e temperatura
