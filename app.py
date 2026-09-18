@@ -1,229 +1,407 @@
 import streamlit as st
 import plotly.graph_objects as go
-import plotly.express as px
 import numpy as np
 import pandas as pd
 import streamlit.components.v1 as components
 
-# 1. Configuração da Página
+# ==========================================
+# 1. CONFIGURAÇÃO DA PÁGINA & ESTILIZAÇÃO CSS
+# ==========================================
 st.set_page_config(
-    page_title="Simulador MONSTRO & Túnel de Vento Aerodinâmico",
-    page_icon="🏎️",
+    page_title="Simulador de Aerodinâmica & Arrasto Fluido",
+    page_icon="⚡",
     layout="wide"
 )
 
-# Estilização CSS Avançada
+# Estilização CSS personalizada para um visual limpo e profissional
 st.markdown("""
     <style>
-    div[data-testid="stColumn"]:nth-child(1) {
-        position: sticky;
-        top: 1rem;
-        align-self: flex-start;
-        z-index: 99;
-    }
-    
-    .main-title {
-        font-size: 2.2rem;
-        font-weight: 900;
-        background: -webkit-linear-gradient(45deg, #00D2FF, #FF2A6D, #FFD700);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+    /* Estilo do título principal */
+    .title-text {
+        font-size: 2.1rem;
+        font-weight: 800;
+        color: #1E293B;
         margin-bottom: 0px;
+    }
+    .subtitle-text {
+        font-size: 0.95rem;
+        color: #64748B;
+        margin-bottom: 15px;
+    }
+    /* Estilização dos cards de métricas */
+    div[data-testid="stMetric"] {
+        background-color: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        padding: 10px 14px;
+        border-radius: 8px;
+    }
+    /* Container ajustado para o layout de 3 colunas */
+    .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 1.5rem;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Dicionários de Dados
-PRESETS_VEICULOS = {
-    "Carro Popular (Hatch/Sedan)": {"cd": 0.32, "area": 2.2, "massa": 1100, "potencia_cv": 100, "tipo": "carro"},
-    "Carro Esportivo (Supercarro)": {"cd": 0.28, "area": 1.9, "massa": 1400, "potencia_cv": 450, "tipo": "carro_esportivo"},
-    "Caminhão / Ônibus": {"cd": 0.80, "area": 8.0, "massa": 12000, "potencia_cv": 400, "tipo": "caixa"},
-    "Asa de Avião / Aerofólio": {"cd": 0.05, "area": 1.2, "massa": 500, "potencia_cv": 200, "tipo": "asa"}
+# ==========================================
+# 2. BASE DE DADOS REALISTA (PRESETS FIXOS)
+# ==========================================
+# Valores físicos reais de coeficiente de arrasto (Cd) e área frontal (m²)
+VEICULOS_PRESETS = {
+    "Terrestres": {
+        "Volkswagen Gol G6 (Carro Popular)": {"cd": 0.34, "area": 2.10, "tipo": "terrestre", "fixo": True},
+        "Tesla Model S (Sedan Aerodinâmico)": {"cd": 0.208, "area": 2.34, "tipo": "terrestre", "fixo": True}
+    },
+    "Aéreos": {
+        "Boeing 737-800 (Aeronave Comercial)": {"cd": 0.027, "area": 12.50, "tipo": "aereo", "fixo": True},
+        "Embraer Super Tucano (Militar/Ataque)": {"cd": 0.032, "area": 3.80, "tipo": "aereo", "fixo": True}
+    },
+    "Aquáticos": {
+        "Submarino Classe Riachuelo (Submerso)": {"cd": 0.04, "area": 28.00, "tipo": "aquatico", "fixo": True},
+        "Lancha Esportiva (Em Planio)": {"cd": 0.25, "area": 3.50, "tipo": "aquatico", "fixo": True}
+    }
 }
 
 # ==========================================
-# BARRA LATERAL
+# 3. ESTRUTURA DO LAYOUT EM TRÊS COLUNAS
 # ==========================================
-with st.sidebar:
-    st.markdown("### ⚙️ Parâmetros do Túnel de Vento")
+col_esq, col_centro, col_dir = st.columns([1, 2.2, 1], gap="medium")
+
+# ----------------------------------------------------
+# COLUNA ESQUERDA: AMBIENTE, ALTITUDE E VELOCIDADE
+# ----------------------------------------------------
+with col_esq:
+    st.markdown("### 🌐 Ambiente & Clima")
     st.write("---")
     
-    preset_sel = st.selectbox("Selecione o Modelo no Túnel:", list(PRESETS_VEICULOS.keys()), index=0)
-    p_d = PRESETS_VEICULOS[preset_sel]
+    # Escolha da Altitude / Meio Fluido Dinâmico
+    tipo_meio = st.radio("Meio de Escoamento:", ["Atmosférico (Ar)", "Aquático (Água Doce/Mar)"])
     
-    v_kmh = st.slider("Velocidade do Vento (km/h)", 10.0, 300.0, 120.0, 5.0)
-    cd = st.slider("Coeficiente de Arrasto (Cd)", 0.01, 1.20, p_d["cd"], 0.01)
-    area = st.slider("Área Frontal (m²)", 0.5, 10.0, p_d["area"], 0.1)
-    rho = st.slider("Densidade do Ar ρ (kg/m³)", 0.5, 1.5, 1.225, 0.05)
-
-# Cálculos Básicos
-v_ms = v_kmh / 3.6
-fd = 0.5 * rho * (v_ms**2) * cd * area
-pot_cv = (fd * v_ms) / 735.5
-
-# ==========================================
-# ÁREA PRINCIPAL
-# ==========================================
-st.markdown('<p class="main-title">🌬️ Túnel de Vento Aerodinâmico Interativo</p>', unsafe_allow_html=True)
-
-m1, m2, m3 = st.columns(3)
-m1.metric("Velocidade do Fluxo", f"{v_kmh:.0f} km/h", f"{v_ms:.1f} m/s")
-m2.metric("Força de Arrasto (Fd)", f"{fd:.1f} N")
-m3.metric("Potência para Vencer o Vento", f"{pot_cv:.1f} CV")
-
-st.write("---")
-
-tab_tunnel, tab_cfd = st.tabs(["🌬️ Animação de Partículas (Túnel de Vento)", "📊 Campo de Pressão & Streamlines (CFD)"])
+    if tipo_meio == "Atmosférico (Ar)":
+        altitude = st.slider("Altitude em Relação ao Nível do Mar (m):", 0, 10000, 0, step=200)
+        temp_c = st.slider("Temperatura do Ar (°C):", -10, 40, 20, step=1)
+        
+        # Modelo de Atmosfera Padrão (ISA) - Variação real de Densidade (rho)
+        temp_k = temp_c + 273.15
+        p_atm = 101325 * ((1 - 2.25577e-5 * altitude) ** 5.25588)  # Pressão barométrica em Pa
+        rho = p_atm / (287.05 * temp_k)                          # Densidade corrigida (kg/m³)
+        st.caption(f"🍃 Densidade Dinâmica do Ar ($\rho$): **{rho:.3f} kg/m³**")
+    else:
+        altitude = 0
+        rho = 998.2  # Densidade da água (kg/m³)
+        st.caption(f"💧 Densidade da Água ($\rho$): **{rho:.1f} kg/m³**")
+        
+    st.write("---")
+    st.markdown("### ⏱️ Velocidade de Ensaio")
+    v_kmh = st.slider("Velocidade do Fluxo (km/h):", 10.0, 300.0, 110.0, step=5.0)
+    v_ms = v_kmh / 3.6  # Conversão para m/s
 
 # ----------------------------------------------------
-# TAB 1: ANIMAÇÃO EM CANVAS (PARTÍCULAS DE VENTO)
+# COLUNA DIREITA: SELEÇÃO DE VEÍCULOS E PRESET CUSTOM
 # ----------------------------------------------------
-with tab_tunnel:
-    # Código JS/Canvas responsivo que se ajusta em tempo real com os sliders
-    canvas_code = f"""
-    <div style="text-align: center; background-color: #0E1117; padding: 10px; border-radius: 10px;">
-        <canvas id="windTunnel" width="800" height="350" style="border: 1px solid #30363D; border-radius: 8px; background: #05070A;"></canvas>
-    </div>
+with col_dir:
+    st.markdown("### 🚘 Seleção de Veículos")
+    st.write("---")
+    
+    categoria_sel = st.selectbox("Categoria:", ["Terrestres", "Aéreos", "Aquáticos"])
+    opcoes_categoria = list(VEICULOS_PRESETS[categoria_sel].keys()) + ["🔧 Preset Customizável (Modificável)"]
+    
+    veiculo_a = st.selectbox("Veículo Principal (Objeto A):", opcoes_categoria, index=0)
+    
+    # Lógica do Preset Customizável vs Presets Fixos e Inalteráveis
+    if veiculo_a == "🔧 Preset Customizável (Modificável)":
+        st.info("Ajuste os parâmetros abaixo para seu veículo customizado:")
+        cd_a = st.number_input("Coeficiente de Arrasto (Cd):", value=0.300, format="%.3f", step=0.01)
+        area_a = st.number_input("Área Frontal (m²):", value=2.00, format="%.2f", step=0.1)
+        tipo_anim_a = "terrestre"
+    else:
+        dados_a = VEICULOS_PRESETS[categoria_sel][veiculo_a]
+        cd_a = dados_a["cd"]
+        area_a = dados_a["area"]
+        tipo_anim_a = dados_a["tipo"]
+        st.success(f"**Presets Fixos:** Cd = `{cd_a}` | Área = `{area_a} m²`")
 
-    <script>
-        const canvas = document.getElementById('windTunnel');
-        const ctx = canvas.getContext('2d');
+    st.write("---")
+    # Botão de Comparação de Veículos
+    comparar = st.toggle("🔀 Modo Comparação (Linha Dupla)", value=False)
+    
+    if comparar:
+        st.markdown("**Veículo Secundário (Objeto B):**")
+        veiculo_b = st.selectbox("Selecione o Veículo B:", opcoes_categoria, index=1 if len(opcoes_categoria) > 1 else 0)
+        
+        if veiculo_b == "🔧 Preset Customizável (Modificável)":
+            cd_b = st.number_input("Cd (Objeto B):", value=0.250, format="%.3f", step=0.01)
+            area_b = st.number_input("Área m² (Objeto B):", value=1.80, format="%.2f", step=0.1)
+        else:
+            dados_b = VEICULOS_PRESETS[categoria_sel][veiculo_b]
+            cd_b = dados_b["cd"]
+            area_b = dados_b["area"]
+            st.caption(f"**Objeto B Fixos:** Cd = `{cd_b}` | Área = `{area_b} m²`")
 
-        const speed = {v_ms} * 0.15;  // Velocidade das partículas
-        const cd = {cd};              // Define turbulência
-        const objectType = "{p_d['tipo']}";
+# ----------------------------------------------------
+# CÁLCULOS FÍSICOS REAIS
+# ----------------------------------------------------
+# Fd = 0.5 * rho * v^2 * Cd * A
+fd_a = 0.5 * rho * (v_ms ** 2) * cd_a * area_a
+pot_w_a = fd_a * v_ms
+pot_cv_a = pot_w_a / 735.499  # Conversão de Watts para Cavalo-Vapor (CV)
 
-        // Criar partículas de vento
-        let particles = [];
-        const numParticles = 120;
+if comparar:
+    fd_b = 0.5 * rho * (v_ms ** 2) * cd_b * area_b
+    pot_w_b = fd_b * v_ms
+    pot_cv_b = pot_w_b / 735.499
 
-        for(let i = 0; i < numParticles; i++) {{
-            particles.push({{
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height,
-                vx: speed + Math.random() * 2,
-                vy: 0,
-                size: Math.random() * 2 + 1,
-                color: '#00D2FF'
-            }});
-        }}
+# ----------------------------------------------------
+# COLUNA CENTRAL: GRÁFICOS, ANIMAÇÃO E RESULTADOS
+# ----------------------------------------------------
+with col_centro:
+    st.markdown('<p class="title-text">⚡ Simulador de Aerodinâmica & Arrasto Fluido</p>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitle-text">Análise telemétrica de forças dinâmicas com base em modelos reais e condições atmosféricas.</p>', unsafe_allow_html=True)
+    
+    # Exibição de Métricas em Destaque
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Força de Arrasto (Fd)", f"{fd_a:.1f} N")
+    m2.metric("Potência Exigida", f"{pot_cv_a:.1f} CV", f"{pot_w_a/1000:.1f} kW")
+    m3.metric("Velocidade do Fluxo", f"{v_kmh:.0f} km/h", f"{v_ms:.1f} m/s")
+    
+    st.write("---")
+    
+    # Abas para Organização dos Gráficos e da Animação
+    tab_anim, tab_fd, tab_pot = st.tabs([
+        "💨 Animação do Fluxo (Partículas)", 
+        "📈 Força de Arrasto (Fd vs V)", 
+        "⚡ Potência Requerida (CV vs V)"
+    ])
 
-        function drawObject() {{
-            ctx.fillStyle = '#FF2A6D';
-            ctx.strokeStyle = '#FFFFFF';
-            ctx.lineWidth = 2;
-
-            ctx.beginPath();
-            if (objectType === 'carro' || objectType === 'carro_esportivo') {{
-                // Desenhar Silhueta de Carro
-                ctx.moveTo(300, 220);
-                ctx.lineTo(340, 220);
-                ctx.lineTo(370, 180);
-                ctx.lineTo(440, 180);
-                ctx.lineTo(480, 220);
-                ctx.lineTo(520, 220);
-                ctx.lineTo(520, 240);
-                ctx.lineTo(300, 240);
-                ctx.closePath();
-            }} else if (objectType === 'asa') {{
-                // Desenhar Gota / Aerofólio
-                ctx.ellipse(400, 210, 80, 25, Math.PI / 12, 0, 2 * Math.PI);
-            }} else {{
-                // Desenhar Bloco / Caminhão
-                ctx.rect(320, 150, 160, 90);
+    # ----------------------------------------------------
+    # ABA 1: ANIMAÇÃO DE PARTÍCULAS BATING NO VEÍCULO
+    # ----------------------------------------------------
+    with tab_anim:
+        st.markdown("##### Visualização das Partículas de Vento no Túnel de Aerodinâmica")
+        
+        # Injeção de Canvas HTML/JS para Animação de Partículas em Tempo Real
+        canvas_html = f"""
+        <div style="text-align: center; background-color: #0F172A; padding: 8px; border-radius: 10px;">
+            <canvas id="particleCanvas" width="750" height="320" style="border: 1px solid #334155; border-radius: 8px; background: #020617;"></canvas>
+        </div>
+        <script>
+            const canvas = document.getElementById('particleCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            const speed = {v_ms} * 0.18;
+            const cd = {cd_a};
+            const shapeType = "{tipo_anim_a}";
+            
+            let particles = [];
+            for(let i = 0; i < 110; i++) {{
+                particles.push({{
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: speed + Math.random() * 2,
+                    vy: 0,
+                    size: Math.random() * 2 + 1,
+                    color: '#38BDF8'
+                }});
             }}
-            ctx.fill();
-            ctx.stroke();
-        }}
 
-        function animate() {{
-            ctx.fillStyle = 'rgba(5, 7, 10, 0.2)'; // Efeito Rastro
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            drawObject();
-
-            particles.forEach(p => {{
-                // Lógica de Desvio Aerodinâmico simples ao se aproximar do objeto
-                let dx = p.x - 400;
-                let dy = p.y - 200;
-                let dist = Math.sqrt(dx*dx + dy*dy);
-
-                if (dist < 100) {{
-                    let angle = Math.atan2(dy, dx);
-                    p.vy += Math.sin(angle) * (cd * 1.5);
-                    
-                    // Mudar de cor no impacto (Alta Pressão -> Amarelo/Vermelho)
-                    p.color = '#FFD700';
-                }} else {{
-                    p.vy *= 0.95; // Retorna ao fluxo normal
-                    p.color = '#00D2FF';
-                }}
-
-                p.x += p.vx;
-                p.y += p.vy;
-
-                // Reiniciar partículas que saem da tela
-                if (p.x > canvas.width) {{
-                    p.x = 0;
-                    p.y = Math.random() * canvas.height;
-                    p.vx = speed + Math.random() * 2;
-                    p.vy = 0;
-                }}
-            }});
-
-            particles.forEach(p => {{
-                ctx.fillStyle = p.color;
+            function drawVehicle() {{
+                ctx.fillStyle = '#F43F5E';
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                
+                if (shapeType === 'terrestre') {{
+                    // Silhueta de Veículo Terrestre
+                    ctx.moveTo(280, 200); ctx.lineTo(330, 200); ctx.lineTo(370, 150);
+                    ctx.lineTo(450, 150); ctx.lineTo(490, 200); ctx.lineTo(520, 200);
+                    ctx.lineTo(520, 220); ctx.lineTo(280, 220);
+                }} else if (shapeType === 'aereo') {{
+                    // Silhueta Aerodinâmica de Avião
+                    ctx.ellipse(400, 185, 110, 22, 0, 0, 2 * Math.PI);
+                }} else {{
+                    // Silhueta Hidrodinâmica de Casco/Submarino
+                    ctx.ellipse(400, 185, 95, 38, 0, 0, 2 * Math.PI);
+                }}
                 ctx.fill();
-            }});
+                ctx.stroke();
+            }}
 
-            requestAnimationFrame(animate);
-        }}
+            function render() {{
+                ctx.fillStyle = 'rgba(2, 6, 23, 0.25)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                drawVehicle();
+                
+                particles.forEach(p => {{
+                    let dx = p.x - 400;
+                    let dy = p.y - 185;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist < 90) {{
+                        let angle = Math.atan2(dy, dx);
+                        p.vy += Math.sin(angle) * (cd * 2.2);
+                        p.color = '#FBBF24'; // Mudança de cor na zona de alta pressão
+                    }} else {{
+                        p.vy *= 0.92;
+                        p.color = '#38BDF8';
+                    }}
+                    
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    
+                    if (p.x > canvas.width) {{
+                        p.x = 0;
+                        p.y = Math.random() * canvas.height;
+                        p.vx = speed + Math.random() * 2;
+                        p.vy = 0;
+                    }}
+                    
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }});
+                
+                requestAnimationFrame(render);
+            }}
+            render();
+        </script>
+        """
+        components.html(canvas_html, height=350)
 
-        animate();
-    </script>
-    """
-    components.html(canvas_code, height=390)
+    # Vetorização do Eixo X (Velocidades para os gráficos)
+    v_vetor_kmh = np.linspace(1, 250, 100)
+    v_vetor_ms = v_vetor_kmh / 3.6
 
-# ----------------------------------------------------
-# TAB 2: CAMPO DE PRESSÃO & STREAMLINES (PLOTLY)
-# ----------------------------------------------------
-with tab_cfd:
-    x = np.linspace(-3, 3, 40)
-    y = np.linspace(-2, 2, 30)
-    X, Y = np.meshgrid(x, y)
+    # ----------------------------------------------------
+    # ABA 2: GRÁFICO DA FORÇA DE ARRASTO (COM SOMBREAMENTO)
+    # ----------------------------------------------------
+    with tab_fd:
+        fd_vetor_a = 0.5 * rho * (v_vetor_ms ** 2) * cd_a * area_a
+        
+        fig_fd = go.Figure()
+        
+        # Curva do Veículo A com Sombreamento (fill='tozeroy')
+        fig_fd.add_trace(go.Scatter(
+            x=v_vetor_kmh, y=fd_vetor_a,
+            mode='lines',
+            name=f'A: {veiculo_a}',
+            line=dict(color='#0284C7', width=3),
+            fill='tozeroy',
+            fillcolor='rgba(2, 132, 199, 0.15)',
+            hovertemplate="Velocidade: %{x:.1f} km/h<br>Força de Arrasto: %{y:.1f} N<extra></extra>"
+        ))
+        
+        # Destaque do Ponto Selecionado
+        fig_fd.add_trace(go.Scatter(
+            x=[v_kmh], y=[fd_a],
+            mode='markers',
+            name='Ponto Atual (A)',
+            marker=dict(color='#0284C7', size=11, symbol='circle'),
+            hovertemplate="Ponto Atual A<br>V: %{x:.1f} km/h<br>Fd: %{y:.1f} N<extra></extra>"
+        ))
 
-    # Potencial de escoamento ao redor de um cilindro/obstáculo aerodinâmico
-    R = 0.8 * (cd ** 0.5)
-    r2 = X**2 + Y**2
-    r2[r2 < R**2] = R**2  # Evita divisão por zero no objeto
+        # Se o Modo Comparação estiver ativo -> Adiciona a Segunda Linha
+        if comparar:
+            fd_vetor_b = 0.5 * rho * (v_vetor_ms ** 2) * cd_b * area_b
+            fig_fd.add_trace(go.Scatter(
+                x=v_vetor_kmh, y=fd_vetor_b,
+                mode='lines',
+                name=f'B: {veiculo_b}',
+                line=dict(color='#E11D48', width=3),
+                fill='tozeroy',
+                fillcolor='rgba(225, 29, 72, 0.12)',
+                hovertemplate="Velocidade: %{x:.1f} km/h<br>Força de Arrasto: %{y:.1f} N<extra></extra>"
+            ))
+            fig_fd.add_trace(go.Scatter(
+                x=[v_kmh], y=[fd_b],
+                mode='markers',
+                name='Ponto Atual (B)',
+                marker=dict(color='#E11D48', size=11, symbol='square'),
+                hovertemplate="Ponto Atual B<br>V: %{x:.1f} km/h<br>Fd: %{y:.1f} N<extra></extra>"
+            ))
 
-    # Componentes de Velocidade (u, v)
-    u = v_ms * (1 - (R**2 * (X**2 - Y**2)) / (r2**2))
-    v = v_ms * (-2 * R**2 * X * Y) / (r2**2)
-    
-    # Campo de Pressão Relativa (Bernoulli: P = 0.5 * rho * (V_inf^2 - V^2))
-    vel_mag = np.sqrt(u**2 + v**2)
-    pressao = 0.5 * rho * (v_ms**2 - vel_mag**2)
+        # Estilização do Gráfico com Destaque nos Eixos X e Y
+        fig_fd.update_layout(
+            title="Curva de Força de Arrasto ($F_d = \\frac{1}{2} \\rho v^2 C_d A$)",
+            xaxis=dict(
+                title="<b>Velocidade (km/h)</b>",
+                showgrid=True, gridcolor='#E2E8F0',
+                showline=True, linewidth=2, linecolor='#0F172A', mirror=True
+            ),
+            yaxis=dict(
+                title="<b>Força de Arrasto Fd (N)</b>",
+                showgrid=True, gridcolor='#E2E8F0',
+                showline=True, linewidth=2, linecolor='#0F172A', mirror=True
+            ),
+            hovermode="x unified",
+            template="plotly_white",
+            height=400,
+            margin=dict(l=40, r=20, t=40, b=40)
+        )
+        st.plotly_chart(fig_fd, use_container_width=True)
 
-    # Gráfico Contour com Streamlines
-    fig = go.Figure()
+    # ----------------------------------------------------
+    # ABA 3: GRÁFICO DA POTÊNCIA NECESSÁRIA (MOTOR)
+    # ----------------------------------------------------
+    with tab_pot:
+        pot_vetor_cv_a = (fd_vetor_a * v_vetor_ms) / 735.499
+        
+        fig_pot = go.Figure()
+        
+        # Curva de Potência A com Sombreamento
+        fig_pot.add_trace(go.Scatter(
+            x=v_vetor_kmh, y=pot_vetor_cv_a,
+            mode='lines',
+            name=f'A: {veiculo_a}',
+            line=dict(color='#0D9488', width=3),
+            fill='tozeroy',
+            fillcolor='rgba(13, 148, 136, 0.15)',
+            hovertemplate="Velocidade: %{x:.1f} km/h<br>Potência Requerida: %{y:.1f} CV<extra></extra>"
+        ))
+        
+        fig_pot.add_trace(go.Scatter(
+            x=[v_kmh], y=[pot_cv_a],
+            mode='markers',
+            name='Ponto Atual (A)',
+            marker=dict(color='#0D9488', size=11),
+            hovertemplate="Ponto Atual A<br>V: %{x:.1f} km/h<br>Potência: %{y:.1f} CV<extra></extra>"
+        ))
 
-    # Mapa de Calor da Pressão (Vermelho = Alta Pressão na frente, Azul = Baixa Pressão atrás)
-    fig.add_trace(go.Contour(
-        z=pressao, x=x, y=y,
-        colorscale='Turbid',
-        colorbar=dict(title="Pressão (Pa)"),
-        opacity=0.8
-    ))
+        if comparar:
+            pot_vetor_cv_b = (fd_vetor_b * v_vetor_ms) / 735.499
+            fig_pot.add_trace(go.Scatter(
+                x=v_vetor_kmh, y=pot_vetor_cv_b,
+                mode='lines',
+                name=f'B: {veiculo_b}',
+                line=dict(color='#D97706', width=3),
+                fill='tozeroy',
+                fillcolor='rgba(217, 119, 6, 0.12)',
+                hovertemplate="Velocidade: %{x:.1f} km/h<br>Potência Requerida: %{y:.1f} CV<extra></extra>"
+            ))
+            fig_pot.add_trace(go.Scatter(
+                x=[v_kmh], y=[pot_cv_b],
+                mode='markers',
+                name='Ponto Atual (B)',
+                marker=dict(color='#D97706', size=11),
+                hovertemplate="Ponto Atual B<br>V: %{x:.1f} km/h<br>Potência: %{y:.1f} CV<extra></extra>"
+            ))
 
-    fig.update_layout(
-        title="Simulação CFD: Campo de Pressão e Escoamento",
-        xaxis_title="Distância Horizontal (m)",
-        yaxis_title="Altura (m)",
-        template="plotly_dark",
-        height=450
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
+        fig_pot.update_layout(
+            title="Potência Requerida do Motor para Vencer o Arrasto ($P = F_d \\cdot v$)",
+            xaxis=dict(
+                title="<b>Velocidade (km/h)</b>",
+                showgrid=True, gridcolor='#E2E8F0',
+                showline=True, linewidth=2, linecolor='#0F172A', mirror=True
+            ),
+            yaxis=dict(
+                title="<b>Potência Necessária (CV)</b>",
+                showgrid=True, gridcolor='#E2E8F0',
+                showline=True, linewidth=2, linecolor='#0F172A', mirror=True
+            ),
+            hovermode="x unified",
+            template="plotly_white",
+            height=400,
+            margin=dict(l=40, r=20, t=40, b=40)
+        )
+        st.plotly_chart(fig_pot, use_container_width=True)
