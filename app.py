@@ -57,13 +57,20 @@ FLUIDOS = {
     "Customizado": {"rho": 1.225, "visc": 1.81e-5}
 }
 
-PRESETS_VEICULOS = {
+PRESETS_TERRESTRES = {
     "Carro Popular (Hatch/Sedan)": {"cd": 0.32, "area": 2.2, "massa": 1100, "potencia_cv": 100, "crr": 0.012, "comprimento": 4.0},
     "Carro Esportivo (Supercarro)": {"cd": 0.28, "area": 1.9, "massa": 1400, "potencia_cv": 450, "crr": 0.015, "comprimento": 4.5},
     "Carro Elétrico (Design Aerodinâmico)": {"cd": 0.21, "area": 2.1, "massa": 1800, "potencia_cv": 300, "crr": 0.010, "comprimento": 4.7},
     "Caminhão / Ônibus": {"cd": 0.80, "area": 8.0, "massa": 12000, "potencia_cv": 400, "crr": 0.008, "comprimento": 12.0},
     "Ciclista em Pé (Gravel/Urbano)": {"cd": 0.90, "area": 0.6, "massa": 85, "potencia_cv": 0.4, "crr": 0.005, "comprimento": 1.5},
     "Paraquedista (Aberto)": {"cd": 1.20, "area": 1.5, "massa": 80, "potencia_cv": 0, "crr": 0.0, "comprimento": 1.8}
+}
+
+PRESETS_AQUATICOS = {
+    "Lancha Esportiva / Jet Ski": {"cd": 0.25, "area": 1.8, "massa": 900, "potencia_cv": 250, "crr": 0.0, "comprimento": 5.0},
+    "Barco de Carga / Navio": {"cd": 0.45, "area": 25.0, "massa": 45000, "potencia_cv": 1200, "crr": 0.0, "comprimento": 20.0},
+    "Submarino Hidrodinâmico": {"cd": 0.12, "area": 6.0, "massa": 25000, "potencia_cv": 800, "crr": 0.0, "comprimento": 15.0},
+    "Caiaque de Corrida": {"cd": 0.30, "area": 0.4, "massa": 95, "potencia_cv": 0.6, "crr": 0.0, "comprimento": 4.5}
 }
 
 CIDADES_ALTITUDE = {
@@ -84,6 +91,8 @@ with st.sidebar:
     st.markdown("**🌊 Fluido & Termodinâmica**")
     fluido_sel = st.selectbox("Fluido Base:", list(FLUIDOS.keys()), index=0)
     is_ar = "Ar" in fluido_sel
+    is_agua = "Água" in fluido_sel
+    presets_atuais = PRESETS_AQUATICOS if is_agua else PRESETS_TERRESTRES
 
     if is_ar:
         st.markdown("**🏔️ Simulador de Altitude & Temperatura**")
@@ -130,11 +139,11 @@ with col_direita:
     
     with st.container(border=True):
         st.markdown("**🔵 Objeto A (Referência)**")
-        preset_a = st.selectbox("Preset do Veículo:", list(PRESETS_VEICULOS.keys()), index=0)
-        p_a = PRESETS_VEICULOS[preset_a]
+        preset_a = st.selectbox("Preset do Veículo:", list(presets_atuais.keys()), index=0)
+        p_a = presets_atuais[preset_a]
         
         cd_a = st.slider("C_d (Arrasto):", 0.01, 1.5, p_a["cd"], 0.01, key="cd_a")
-        area_a = st.slider("Área Frontal A (m²):", 0.1, 10.0, p_a["area"], 0.1, key="area_a")
+        area_a = st.slider("Área Frontal A (m²):", 0.1, 25.0, p_a["area"], 0.1, key="area_a")
         massa_a = st.number_input("Massa do Veículo (kg):", value=float(p_a["massa"]), step=50.0, key="m_a")
         potencia_cv_a = st.number_input("Potência do Motor (CV):", value=float(p_a["potencia_cv"]), step=10.0, key="p_a")
         comprimento_a = st.number_input("Comprimento do Corpo (m):", value=float(p_a["comprimento"]), step=0.5, key="comp_a")
@@ -151,11 +160,11 @@ with col_direita:
     if comparar:
         with st.container(border=True):
             st.markdown("**🔴 Objeto B (Comparativo)**")
-            preset_b = st.selectbox("Preset do Veículo:", list(PRESETS_VEICULOS.keys()), index=1)
-            p_b = PRESETS_VEICULOS[preset_b]
+            preset_b = st.selectbox("Preset do Veículo:", list(presets_atuais.keys()), index=min(1, len(presets_atuais)-1))
+            p_b = presets_atuais[preset_b]
             
             cd_b = st.slider("C_d (Arrasto):", 0.01, 1.5, p_b["cd"], 0.01, key="cd_b")
-            area_b = st.slider("Área Frontal B (m²):", 0.1, 10.0, p_b["area"], 0.1, key="area_b")
+            area_b = st.slider("Área Frontal B (m²):", 0.1, 25.0, p_b["area"], 0.1, key="area_b")
             massa_b = st.number_input("Massa do Veículo (kg):", value=float(p_b["massa"]), step=50.0, key="m_b")
             potencia_cv_b = st.number_input("Potência do Motor (CV):", value=float(p_b["potencia_cv"]), step=10.0, key="p_b")
             comprimento_b = st.number_input("Comprimento do Corpo (m):", value=float(p_b["comprimento"]), step=0.5, key="comp_b")
@@ -335,7 +344,7 @@ with col_centro:
         nomes_veic = []
         forcas_veic = []
         
-        for nome, dados in PRESETS_VEICULOS.items():
+        for nome, dados in presets_atuais.items():
             fd_temp = 0.5 * rho * ((120/3.6)**2) * dados["cd"] * dados["area"]
             nomes_veic.append(nome)
             forcas_veic.append(fd_temp)
