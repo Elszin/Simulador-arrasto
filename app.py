@@ -8,12 +8,11 @@ import streamlit.components.v1 as components
 # 1. CONFIGURAÇÃO DA PÁGINA & ESTILIZAÇÃO CSS
 # ==========================================
 st.set_page_config(
-    page_title="Simulador de Aerodinâmica & Arrasto Fluido",
+    page_title="Simulador Completo de Aerodinâmica & Arrasto Fluido",
     page_icon="⚡",
     layout="wide"
 )
 
-# Estilização CSS personalizada
 st.markdown("""
     <style>
     .title-text {
@@ -45,16 +44,16 @@ st.markdown("""
 # ==========================================
 VEICULOS_PRESETS = {
     "Terrestres": {
-        "Volkswagen Gol G6 (Carro Popular)": {"cd": 0.34, "area": 2.10, "tipo": "terrestre", "fixo": True},
-        "Tesla Model S (Sedan Aerodinâmico)": {"cd": 0.208, "area": 2.34, "tipo": "terrestre", "fixo": True}
+        "Volkswagen Gol G6 (Carro Popular)": {"cd": 0.34, "area": 2.10, "massa": 1020, "tipo": "terrestre", "fixo": True},
+        "Tesla Model S (Sedan Aerodinâmico)": {"cd": 0.208, "area": 2.34, "massa": 2100, "tipo": "terrestre", "fixo": True}
     },
     "Aéreos": {
-        "Boeing 737-800 (Aeronave Comercial)": {"cd": 0.027, "area": 12.50, "tipo": "aereo", "fixo": True},
-        "Embraer Super Tucano (Militar/Ataque)": {"cd": 0.032, "area": 3.80, "tipo": "aereo", "fixo": True}
+        "Boeing 737-800 (Aeronave Comercial)": {"cd": 0.027, "area": 12.50, "massa": 41140, "tipo": "aereo", "fixo": True},
+        "Embraer Super Tucano (Militar/Ataque)": {"cd": 0.032, "area": 3.80, "massa": 3200, "tipo": "aereo", "fixo": True}
     },
     "Aquáticos": {
-        "Submarino Classe Riachuelo (Submerso)": {"cd": 0.04, "area": 28.00, "tipo": "aquatico", "fixo": True},
-        "Lancha Esportiva (Em Planio)": {"cd": 0.25, "area": 3.50, "tipo": "aquatico", "fixo": True}
+        "Submarino Classe Riachuelo (Submerso)": {"cd": 0.04, "area": 28.00, "massa": 1900000, "tipo": "aquatico", "fixo": True},
+        "Lancha Esportiva (Em Planio)": {"cd": 0.25, "area": 3.50, "massa": 1800, "tipo": "aquatico", "fixo": True}
     }
 }
 
@@ -150,7 +149,7 @@ def gerar_canvas_js(id_canvas, v_ms, cd, shape_type, titulo_label, cor_veiculo="
     """
 
 # ==========================================
-# 3. ESTRUTURA DO LAYOUT EM TRÊS COLUNAS
+# 3. LAYOUT EM TRÊS COLUNAS
 # ==========================================
 col_esq, col_centro, col_dir = st.columns([1, 2.2, 1], gap="medium")
 
@@ -164,22 +163,27 @@ with col_esq:
     tipo_meio = st.radio("Meio de Escoamento:", ["Atmosférico (Ar)", "Aquático (Água Doce/Mar)"])
     
     if tipo_meio == "Atmosférico (Ar)":
-        altitude = st.slider("Altitude em Relação ao Nível do Mar (m):", 0, 10000, 0, step=200)
+        altitude = st.slider("Altitude (m):", 0, 10000, 0, step=200)
         temp_c = st.slider("Temperatura do Ar (°C):", -10, 40, 20, step=1)
         
         temp_k = temp_c + 273.15
         p_atm = 101325 * ((1 - 2.25577e-5 * altitude) ** 5.25588)
         rho = p_atm / (287.05 * temp_k)
-        st.caption(f"🍃 Densidade Dinâmica do Ar ($\rho$): **{rho:.3f} kg/m³**")
+        st.caption(f"🍃 Densidade Dinâmica ($\rho$): **{rho:.3f} kg/m³**")
+        st.caption(f"🌡️ Pressão Barométrica: **{p_atm/100:.1f} hPa**")
     else:
         altitude = 0
         rho = 998.2
         st.caption(f"💧 Densidade da Água ($\rho$): **{rho:.1f} kg/m³**")
         
     st.write("---")
-    st.markdown("### ⏱️ Velocidade de Ensaio")
+    st.markdown("### ⏱️ Ensaio Telemétrico")
     v_kmh = st.slider("Velocidade do Fluxo (km/h):", 10.0, 300.0, 110.0, step=5.0)
     v_ms = v_kmh / 3.6
+    
+    st.write("---")
+    st.markdown("### 📐 Coeficientes Aerodinâmicos")
+    st.latex(r"F_d = \frac{1}{2} \cdot \rho \cdot v^2 \cdot C_d \cdot A")
 
 # ----------------------------------------------------
 # COLUNA DIREITA: SELEÇÃO DE VEÍCULOS E PRESET CUSTOM
@@ -197,13 +201,15 @@ with col_dir:
         st.info("Ajuste os parâmetros do veículo A:")
         cd_a = st.number_input("Cd (Objeto A):", value=0.300, format="%.3f", step=0.01, key="cd_input_a")
         area_a = st.number_input("Área m² (Objeto A):", value=2.00, format="%.2f", step=0.1, key="area_input_a")
+        massa_a = st.number_input("Massa kg (Objeto A):", value=1200, step=50, key="massa_input_a")
         tipo_anim_a = "terrestre"
     else:
         dados_a = VEICULOS_PRESETS[categoria_sel][veiculo_a]
         cd_a = dados_a["cd"]
         area_a = dados_a["area"]
+        massa_a = dados_a["massa"]
         tipo_anim_a = dados_a["tipo"]
-        st.success(f"**Presets Fixos A:** Cd = `{cd_a}` | Área = `{area_a} m²`")
+        st.success(f"**Fixos A:** Cd = `{cd_a}` | Área = `{area_a} m²` | `{massa_a} kg`")
 
     st.write("---")
     comparar = st.toggle("🔀 Modo Comparação (Linha Dupla)", value=False)
@@ -215,13 +221,15 @@ with col_dir:
         if veiculo_b == "🔧 Preset Customizável (Modificável)":
             cd_b = st.number_input("Cd (Objeto B):", value=0.250, format="%.3f", step=0.01, key="cd_input_b")
             area_b = st.number_input("Área m² (Objeto B):", value=1.80, format="%.2f", step=0.1, key="area_input_b")
+            massa_b = st.number_input("Massa kg (Objeto B):", value=1100, step=50, key="massa_input_b")
             tipo_anim_b = "terrestre"
         else:
             dados_b = VEICULOS_PRESETS[categoria_sel][veiculo_b]
             cd_b = dados_b["cd"]
             area_b = dados_b["area"]
+            massa_b = dados_b["massa"]
             tipo_anim_b = dados_b["tipo"]
-            st.caption(f"**Presets Fixos B:** Cd = `{cd_b}` | Área = `{area_b} m²`")
+            st.caption(f"**Fixos B:** Cd = `{cd_b}` | Área = `{area_b} m²` | `{massa_b} kg`")
 
 # ----------------------------------------------------
 # CÁLCULOS FÍSICOS REAIS
@@ -229,38 +237,41 @@ with col_dir:
 fd_a = 0.5 * rho * (v_ms ** 2) * cd_a * area_a
 pot_w_a = fd_a * v_ms
 pot_cv_a = pot_w_a / 735.499
+q_dyn_a = 0.5 * rho * (v_ms ** 2)
 
 if comparar:
     fd_b = 0.5 * rho * (v_ms ** 2) * cd_b * area_b
     pot_w_b = fd_b * v_ms
     pot_cv_b = pot_w_b / 735.499
+    q_dyn_b = 0.5 * rho * (v_ms ** 2)
 
 # ----------------------------------------------------
-# COLUNA CENTRAL: GRÁFICOS, ANIMAÇÃO E RESULTADOS
+# COLUNA CENTRAL: GRÁFICOS, ANIMAÇÃO E TABELAS
 # ----------------------------------------------------
 with col_centro:
     st.markdown('<p class="title-text">⚡ Simulador de Aerodinâmica & Arrasto Fluido</p>', unsafe_allow_html=True)
     st.markdown('<p class="subtitle-text">Análise telemétrica de forças dinâmicas com base em modelos reais e condições atmosféricas.</p>', unsafe_allow_html=True)
     
-    m1, m2, m3 = st.columns(3)
+    # Métricas Principais
+    m1, m2, m3, m4 = st.columns(4)
     m1.metric("Força de Arrasto (Fd)", f"{fd_a:.1f} N")
     m2.metric("Potência Exigida", f"{pot_cv_a:.1f} CV", f"{pot_w_a/1000:.1f} kW")
-    m3.metric("Velocidade do Fluxo", f"{v_kmh:.0f} km/h", f"{v_ms:.1f} m/s")
+    m3.metric("Pressão Dinâmica", f"{q_dyn_a:.1f} Pa")
+    m4.metric("Velocidade do Fluxo", f"{v_kmh:.0f} km/h", f"{v_ms:.1f} m/s")
     
     st.write("---")
     
-    tab_fd, tab_pot, tab_anim = st.tabs([
+    tab_fd, tab_pot, tab_anim, tab_dados = st.tabs([
         "📈 Força de Arrasto (Gráfico Principal)", 
         "⚡ Potência Requerida (CV)",
-        "💨 Túnel de Vento (Partículas)"
+        "💨 Túnel de Vento (Partículas)",
+        "📋 Tabela de Dados Telemétricos"
     ])
 
     v_vetor_kmh = np.linspace(1, 250, 100)
     v_vetor_ms = v_vetor_kmh / 3.6
 
-    # ----------------------------------------------------
-    # ABA 1: GRÁFICO PRINCIPAL - FORÇA DE ARRASTO
-    # ----------------------------------------------------
+    # ABA 1: GRÁFICO PRINCIPAL DE FORÇA DE ARRASTO
     with tab_fd:
         fd_vetor_a = 0.5 * rho * (v_vetor_ms ** 2) * cd_a * area_a
         
@@ -322,9 +333,7 @@ with col_centro:
         )
         st.plotly_chart(fig_fd, use_container_width=True)
 
-    # ----------------------------------------------------
-    # ABA 2: GRÁFICO DA POTÊNCIA NECESSÁRIA (MOTOR)
-    # ----------------------------------------------------
+    # ABA 2: GRÁFICO DA POTÊNCIA NECESSÁRIA
     with tab_pot:
         pot_vetor_cv_a = (fd_vetor_a * v_vetor_ms) / 735.499
         
@@ -386,9 +395,7 @@ with col_centro:
         )
         st.plotly_chart(fig_pot, use_container_width=True)
 
-    # ----------------------------------------------------
     # ABA 3: TÚNEL DE VENTO COM SUPORTE À COMPARAÇÃO DUPAL
-    # ----------------------------------------------------
     with tab_anim:
         st.markdown("##### Visualização das Partículas de Vento no Túnel de Aerodinâmica")
         
@@ -400,3 +407,28 @@ with col_centro:
             components.html(html_combinado, height=530)
         else:
             components.html(html_code_a, height=270)
+
+    # ABA 4: TABELA DETALHADA DE DADOS TELEMÉTRICOS
+    with tab_dados:
+        st.markdown("##### Resumo Numérico Telemétrico")
+        
+        v_pontos = np.array([40, 80, 120, 160, 200, 240])
+        v_pontos_ms = v_pontos / 3.6
+        fd_pts_a = 0.5 * rho * (v_pontos_ms ** 2) * cd_a * area_a
+        pot_pts_cv_a = (fd_pts_a * v_pontos_ms) / 735.499
+        
+        df_telemetria = pd.DataFrame({
+            "Velocidade (km/h)": v_pontos,
+            "Velocidade (m/s)": np.round(v_pontos_ms, 1),
+            "Arrasto A (N)": np.round(fd_pts_a, 1),
+            "Potência A (CV)": np.round(pot_pts_cv_a, 1)
+        })
+        
+        if comparar:
+            fd_pts_b = 0.5 * rho * (v_pontos_ms ** 2) * cd_b * area_b
+            pot_pts_cv_b = (fd_pts_b * v_pontos_ms) / 735.499
+            df_telemetria["Arrasto B (N)"] = np.round(fd_pts_b, 1)
+            df_telemetria["Potência B (CV)"] = np.round(pot_pts_cv_b, 1)
+            df_telemetria["Diferença Arrasto (N)"] = np.round(fd_pts_a - fd_pts_b, 1)
+            
+        st.dataframe(df_telemetria, use_container_width=True, hide_index=True)
