@@ -1,17 +1,16 @@
 import streamlit as st
 import numpy as np
-import plotly.express as px
+import pandas as pd
 
 # 1. Configuração da Página e Título
-st.set_page_config(page_title="Simulador de Arrasto Aerodinâmico", page_icon="🚗", layout="wide")
+st.set_page_config(page_title="Simulador de Arrasto Aerodinâmico", page_icon="🚗")
 st.title("🚗 Simulador de Força de Arrasto Aerodinâmico")
-st.markdown("Cálculo baseado na equação fundamental: $F_d = \\frac{1}{2} \\cdot \\rho \\cdot v^2 \\cdot C_d \\cdot A$")
+st.write("Cálculo baseado na equação fundamental: $F_d = \\frac{1}{2} \\cdot \\rho \\cdot v^2 \\cdot C_d \\cdot A$")
 
 # 2. Perfis de Veículos Pré-configurados
 veiculo = st.selectbox("Selecione um perfil de veículo para testar:", 
                        ["Personalizado", "Carro Popular", "Esportivo", "Caminhão"])
 
-# Define valores padrão de Cd e Área Frontal segundo o veículo escolhido
 if veiculo == "Carro Popular":
     cd_padrao, a_padrao = 0.32, 2.2
 elif veiculo == "Esportivo":
@@ -38,17 +37,16 @@ col1.metric("Velocidade Selecionada", f"{v_kmh} km/h")
 col2.metric("Força de Arrasto (Fd)", f"{fd:.2f} N")
 col3.metric("Potência Necessária", f"{(fd * v_ms / 1000):.2f} kW")
 
-# 6. Gráfico Interativo do Crescimento Quadrático
+# 6. Gráfico Nativo do Streamlit (Sem dependências externas)
+st.subheader("Gráfico: Comportamento da Força de Arrasto com a Velocidade")
+
 vel_curva_kmh = np.linspace(0, 200, 100)
 vel_curva_ms = vel_curva_kmh / 3.6
 forcas_curva = 0.5 * rho * (vel_curva_ms ** 2) * cd * area
 
-fig = px.line(x=vel_curva_kmh, y=forcas_curva, 
-              labels={'x': 'Velocidade (km/h)', 'y': 'Força de Arrasto (N)'},
-              title="Comportamento da Força de Arrasto com o Aumento da Velocidade")
+df_grafico = pd.DataFrame({
+    "Velocidade (km/h)": vel_curva_kmh,
+    "Força de Arrasto (N)": forcas_curva
+})
 
-# Marca o ponto exato da velocidade selecionada no gráfico
-fig.add_scatter(x=[v_kmh], y=[fd], mode='markers+text', name='Ponto Atual',
-                text=[f"{fd:.1f} N"], textposition="top center")
-
-st.plotly_chart(fig, use_container_width=True)
+st.line_chart(df_grafico, x="Velocidade (km/h)", y="Força de Arrasto (N)")
