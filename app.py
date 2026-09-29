@@ -1,6 +1,6 @@
 import streamlit as st
 import numpy as np
-import matplotlib.pyplot as plt
+import pandas as pd
 
 # 1. Configuração da Página
 st.set_page_config(page_title="Simulador de Arrasto Aerodinâmico", page_icon="🚗", layout="wide")
@@ -16,7 +16,6 @@ veiculo = st.sidebar.selectbox(
     ["Carro Popular", "Esportivo", "Caminhão", "Personalizado"]
 )
 
-# Valores padrão de Cd e Área
 perfis = {
     "Carro Popular": (0.32, 2.2),
     "Esportivo": (0.28, 1.9),
@@ -52,78 +51,37 @@ col4.metric("Potência (CV)", f"{potencia_cv:.1f} cv")
 
 st.markdown("---")
 
-# 5. Gráfico Bonito com Eixo Fixo no Matplotlib
-st.subheader("📈 Comparativo de Curvas de Arrasto (Escala Fixa)")
+# 5. Gráfico Comparativo Nativo
+st.subheader("📈 Comparativo de Curvas de Arrasto (Escala Fixa ate 4500 N)")
 
-# Vetor de velocidades de 0 a 200 km/h
-v_vetor_kmh = np.linspace(0, 200, 200)
+v_vetor_kmh = np.linspace(0, 200, 101)
 v_vetor_ms = v_vetor_kmh / 3.6
 
-# Estilo visual moderno do gráfico (Dark Mode)
-plt.style.use('dark_background')
-fig, ax = plt.subplots(figsize=(10, 5), dpi=150)
-
-color_map = {
-    "Carro Popular": "#00d2ff", # Azul Neon
-    "Esportivo": "#00ff87",    # Verde Neon
-    "Caminhão": "#ff4b4b"      # Vermelho Neon
+dados_grafico = {
+    "Velocidade (km/h)": v_vetor_kmh,
 }
 
-# Desenha as curvas dos 3 veículos principais para comparação
+# Adiciona a curva de cada veículo ao mesmo gráfico
 for nome, (c_d_p, a_p) in perfis.items():
     if nome == "Personalizado":
         continue
-    fd_curva = 0.5 * rho * (v_vetor_ms ** 2) * c_d_p * a_p
-    is_selected = (nome == veiculo)
-    
-    alpha = 1.0 if is_selected else 0.25
-    linewidth = 3.2 if is_selected else 1.5
-    linestyle = '-' if is_selected else '--'
-    
-    ax.plot(
-        v_vetor_kmh, fd_curva, 
-        label=nome, 
-        color=color_map[nome], 
-        alpha=alpha, 
-        linewidth=linewidth, 
-        linestyle=linestyle
-    )
+    dados_grafico[nome] = 0.5 * rho * (v_vetor_ms ** 2) * c_d_p * a_p
 
-# Se for personalizado, desenha a curva personalizada
 if veiculo == "Personalizado":
-    fd_curva_custom = 0.5 * rho * (v_vetor_ms ** 2) * cd * area
-    ax.plot(v_vetor_kmh, fd_curva_custom, label="Personalizado", color="#ffaa00", linewidth=3.2)
-    cor_ponto = "#ffaa00"
-else:
-    cor_ponto = color_map[veiculo]
+    dados_grafico["Personalizado"] = 0.5 * rho * (v_vetor_ms ** 2) * cd * area
 
-# Ponto Atual (Velocidade Selecionada)
-ax.scatter([v_kmh], [fd], color=cor_ponto, s=120, zorder=5, edgecolor='white', linewidth=1.5)
-ax.annotate(
-    f"  {v_kmh} km/h\n  {fd:.0f} N", 
-    (v_kmh, fd), 
-    textcoords="offset points", 
-    xytext=(10, -10), 
-    color='white', 
-    fontsize=10, 
-    weight='bold',
-    bbox=dict(boxstyle="round,pad=0.3", fc="#1e1e1e", ec=cor_ponto, lw=1.5)
+# Linha teto fixo em 4500 N para travar o eixo Y
+dados_grafico["Teto Escala (4500 N)"] = 4500.0
+
+df_grafico = pd.DataFrame(dados_grafico)
+
+colunas_linhas = [c for c in df_grafico.columns if c not in ["Velocidade (km/h)", "Teto Escala (4500 N)"]]
+
+st.line_chart(
+    df_grafico, 
+    x="Velocidade (km/h)", 
+    y=colunas_linhas,
+    height=450
 )
 
-# Linhas auxiliares tracejadas
-ax.axvline(x=v_kmh, color='gray', linestyle=':', alpha=0.5)
-ax.axhline(y=fd, color='gray', linestyle=':', alpha=0.5)
-
-# ESCALA FIXA DOS EIXOS (Não muda quando você mexe no slider!)
-ax.set_xlim(0, 200)
-ax.set_ylim(0, 4500)
-
-# Estilização de Títulos e Grade
-ax.set_title("Comportamento Quadrático da Força de Arrasto (Fd vs V)", fontsize=13, pad=15, color='white', weight='bold')
-ax.set_xlabel("Velocidade (km/h)", fontsize=11, color='white')
-ax.set_ylabel("Força de Arrasto Fd (N)", fontsize=11, color='white')
-ax.grid(True, linestyle='--', alpha=0.2)
-ax.legend(loc="upper left", frameon=True, facecolor="#1e1e1e", edgecolor="gray")
-
-# Exibir no Streamlit
-st.pyplot(fig)
+st.success(f"📍 **Ponto Atual ({veiculo}):** Na velocidade de **{v_kmh} km/h**, a Força de Arrasto e de **{fd:.1f} N** e consome **{potencia_cv:.1f} CV** do motor.")
