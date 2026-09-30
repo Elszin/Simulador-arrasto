@@ -1,6 +1,5 @@
 import streamlit as st
 import plotly.graph_objects as go
-import plotly.express as px
 import numpy as np
 import pandas as pd
 
@@ -89,7 +88,7 @@ def carregar_preset_b():
         st.session_state.comp_b = float(p["comprimento"])
 
 # ==========================================
-# BARRA LATERAL: PARÂMETROS AMBIENTAIS & OPERAÇÃO
+# BARRA LATERAL: PARÂMETROS AMBIENTAIS
 # ==========================================
 with st.sidebar:
     st.markdown("### ⚙️ Configurações do Teste")
@@ -192,8 +191,6 @@ f_total_a = fd_a + f_rol_a
 pot_watts_a = f_total_a * v_propria_ms
 pot_cv_a = pot_watts_a / 735.5
 
-downforce_a = 0.5 * rho * (v_efetiva_ms ** 2) * cl_a * area_asa_a
-
 # Objeto B (se ativo)
 if comparar:
     fd_b = 0.5 * rho * (v_efetiva_ms ** 2) * cd_b * area_b
@@ -208,7 +205,6 @@ if comparar:
 with col_centro:
     st.markdown('<p class="main-title">🏎️ Simulador Aerodinâmico de Veículos</p>', unsafe_allow_html=True)
     
-    # Apenas as duas métricas principais solicitadas
     m1, m2 = st.columns(2)
     m1.metric("Força de Arrasto (Fd)", f"{fd_a:.1f} N")
     m2.metric("Potência Exigida", f"{pot_cv_a:.1f} CV")
@@ -217,10 +213,10 @@ with col_centro:
     
     tab_grafico, tab_desenho = st.tabs([
         "📊 Curvas de Desempenho", 
-        "🌀 Túnel de Vento & Termodinâmica"
+        "🌀 Visualização do Escoamento (Túnel Estático)"
     ])
 
-    # TAB 1: CURVAS DE DESEMPENHO (Apenas Arrasto)
+    # TAB 1: CURVAS DE DESEMPENHO
     with tab_grafico:
         v_vec = np.linspace(10, 220, 100)
         v_vec_ef = np.maximum(0.1, v_vec + v_vento_kmh) / 3.6
@@ -239,171 +235,54 @@ with col_centro:
         fig.update_layout(xaxis_title="Velocidade (km/h)", yaxis_title="Força de Arrasto (N)", template="plotly_white", height=400)
         st.plotly_chart(fig, use_container_width=True)
 
-    # TAB 2: TÚNEL DE VENTO (VENTO DA ESQUERDA PARA A DIREITA)
+    # TAB 2: TÚNEL DE VENTO ESTÁTICO (MAIS SIMPLES E LEVE)
     with tab_desenho:
-        st.markdown("#### 🌀 Fluxo de Ar no Túnel de Vento")
-        st.caption(f"🌡 **{temp_c}°C** ($\rho$: **{rho:.3f} kg/m³**) | 💨 Fluxo Frontal: **{v_efetiva_ms*3.6:.1f} km/h** | Clique em **Play ▶️** para ativar o fluxo!")
+        st.markdown("#### 🌀 Linhas de Escoamento Estáticas")
+        st.caption(f"🌡 **{temp_c}°C** ($\rho$: **{rho:.3f} kg/m³**) | 💨 Velocidade do Vento: **{v_efetiva_ms*3.6:.1f} km/h**")
 
         tipo_veiculo_a = PRESETS_VEICULOS[modelo_a]["tipo"]
         altura_a = np.sqrt(area_a) * 0.95
         x_carro, y_carro = gerar_silhueta_veiculo(tipo_veiculo_a, comprimento_a, altura_a)
         
-        x_asa_pos = comprimento_a * 0.38
-        y_asa_pos = altura_a * 0.82
-        
-        num_linhas = 12
-        pts_por_linha = 35
-        
-        x_min, x_max = -comprimento_a * 1.8, comprimento_a * 1.2
-        largura_grid = x_max - x_min
-        
-        x_grid_base = np.linspace(x_min, x_max, pts_por_linha)
-        y_iniciais = np.linspace(-altura_a * 0.3, altura_a * 2.5, num_linhas)
-        R_eff = altura_a * (0.8 + cd_a * 0.4)
-
-        def calcular_particulas(offset):
-            px_l, py_l, vel_l, sz_l = [], [], [], []
-            for y0 in y_iniciais:
-                for x_raw in x_grid_base:
-                    x = x_min + ((x_raw - x_min + offset) % largura_grid)
-                    
-                    r2_carro = x**2 + (y0 - altura_a*0.5)**2
-                    dy_carro = (R_eff**2 * max(0.1, y0)) / max(r2_carro, R_eff**1.8) * np.exp(-((x + comprimento_a*0.1) / (comprimento_a*0.7))**2)
-                    
-                    dy_asa = 0.0
-                    v_boost_asa = 0.0
-                    
-                    if usar_aerofolio:
-                        dist_asa_sq = (x - x_asa_pos)**2 + (y0 - y_asa_pos)**2
-                        fator_alcance = np.exp(-dist_asa_sq / (0.35 * comprimento_a))
-                        dy_asa = (cl_a * 0.45) * fator_alcance
-                        v_boost_asa = (cl_a * 35.0) * fator_alcance
-
-                    y_part = max(0.02, y0 + dy_carro + dy_asa)
-                    
-                    v_relativa = v_efetiva_ms * (1.0 - (R_eff**2 * (x**2 - (y0-altura_a*0.5)**2)) / max(r2_carro**2, R_eff**3.5))
-                    v_local_total = abs(v_relativa) * 3.6 + v_boost_asa
-                    
-                    px_l.append(x)
-                    py_l.append(y_part)
-                    vel_l.append(v_local_total)
-                    sz_l.append(4 + (v_local_total / 12.0))
-            return px_l, py_l, vel_l, sz_l
-
-        px0, py0, vel0, sz0 = calcular_particulas(0.0)
-
         fig_tunel = go.Figure()
 
-        fig_tunel.add_trace(go.Scatter(
-            x=px0, y=py0,
-            mode='markers',
-            marker=dict(
-                size=sz0,
-                color=vel0,
-                colorscale='Turbo',
-                showscale=True,
-                colorbar=dict(title="Velocidade (km/h)", len=0.8)
-            ),
-            name='Moléculas de Ar'
-        ))
+        # Desenhar linhas de fluxo simplificadas (linhas horizontais que curvam ao passar por cima do carro)
+        x_linhas = np.linspace(-comprimento_a * 1.5, comprimento_a * 1.5, 50)
+        y_niveis = np.linspace(0.1, altura_a * 2.0, 10)
 
+        for y0 in y_niveis:
+            # Desvio simulado leve baseado na altura do carro
+            desvio = (altura_a * 0.5) / (1.0 + (x_linhas / (comprimento_a * 0.5))**2) if y0 < altura_a * 1.2 else 0
+            y_linha = np.full_like(x_linhas, y0) + desvio * max(0, (1 - y0/(altura_a*1.5)))
+            
+            fig_tunel.add_trace(go.Scatter(
+                x=x_linhas, y=y_linha,
+                mode='lines',
+                line=dict(color='#00D2FF', width=2),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+
+        # Silhueta do Veículo
         fig_tunel.add_trace(go.Scatter(
             x=x_carro, y=y_carro,
             fill='toself', fillcolor='rgba(25, 28, 36, 0.95)',
-            line=dict(color='#00D2FF', width=3), name='Veículo A'
+            line=dict(color='#FF2A6D', width=3), name='Veículo A'
         ))
 
-        r_raio = altura_a * 0.22
-        x_roda_front = -comprimento_a * 0.3
-        x_roda_tras = comprimento_a * 0.3
-        theta = np.linspace(0, 2*np.pi, 20)
-
-        fig_tunel.add_trace(go.Scatter(
-            x=x_roda_tras + r_raio*np.cos(theta), y=r_raio + r_raio*np.sin(theta),
-            fill='toself', fillcolor='#111', line=dict(color='#555', width=2), showlegend=False
-        ))
-        fig_tunel.add_trace(go.Scatter(
-            x=x_roda_front + r_raio*np.cos(theta), y=r_raio + r_raio*np.sin(theta),
-            fill='toself', fillcolor='#111', line=dict(color='#555', width=2), showlegend=False
-        ))
-
-        if usar_aerofolio:
-            fig_tunel.add_trace(go.Scatter(
-                x=[x_asa_pos, x_asa_pos], y=[y_asa_pos - 0.15*altura_a, y_asa_pos],
-                mode='lines', line=dict(color='#888', width=3), showlegend=False
-            ))
-            ang = 0.15 + (cl_a * 0.08)
-            x_asa_line = [x_asa_pos - 0.2*comprimento_a*0.2, x_asa_pos + 0.2*comprimento_a*0.2]
-            y_asa_line = [y_asa_pos - 0.1*altura_a*ang, y_asa_pos + 0.1*altura_a*ang]
-            fig_tunel.add_trace(go.Scatter(
-                x=x_asa_line, y=y_asa_line,
-                mode='lines', line=dict(color='#FFD700', width=6), name='Aerofólio'
-            ))
-
-        vec_scale = 0.002
+        # Seta indicando a força de arrasto
         fig_tunel.add_annotation(
-            x=comprimento_a/2 + (fd_a * vec_scale), y=altura_a*0.5, ax=comprimento_a/2, ay=altura_a*0.5,
+            x=comprimento_a/2 + (fd_a * 0.002), y=altura_a*0.5, ax=comprimento_a/2, ay=altura_a*0.5,
             xref="x", yref="y", axref="x", ayref="y",
             showarrow=True, arrowhead=3, arrowsize=1.5, arrowwidth=3, arrowcolor="#FF2A6D",
             text=f"Fd = {fd_a:.0f} N"
         )
 
-        num_frames = 20
-        frames = []
-        passo_offsets = np.linspace(0, largura_grid, num_frames, endpoint=False)
-
-        for i, off in enumerate(passo_offsets):
-            px_f, py_f, vel_f, sz_f = calcular_particulas(off)
-            frames.append(
-                go.Frame(
-                    data=[go.Scatter(
-                        x=px_f, y=py_f,
-                        mode='markers',
-                        marker=dict(
-                            size=sz_f,
-                            color=vel_f,
-                            colorscale='Turbo'
-                        )
-                    )],
-                    name=f"frame_{i}"
-                )
-            )
-
-        fig_tunel.frames = frames
-
         fig_tunel.update_layout(
-            template="plotly_dark", height=480,
-            xaxis=dict(range=[-comprimento_a*1.8, comprimento_a*1.2], title="Comprimento (m)"),
+            template="plotly_dark", height=450,
+            xaxis=dict(range=[-comprimento_a*1.5, comprimento_a*1.5], title="Comprimento (m)"),
             yaxis=dict(range=[-0.1, altura_a*2.2], title="Altura (m)"),
-            showlegend=False,
-            updatemenus=[{
-                "type": "buttons",
-                "showactive": False,
-                "direction": "left",
-                "x": 0.0, "y": -0.15,
-                "buttons": [
-                    {
-                        "label": "▶️ Play Animação",
-                        "method": "animate",
-                        "args": [None, {
-                            "frame": {"duration": 50, "redraw": True},
-                            "fromcurrent": True,
-                            "transition": {"duration": 0},
-                            "mode": "immediate",
-                            "loop": True
-                        }]
-                    },
-                    {
-                        "label": "⏸️ Pausar",
-                        "method": "animate",
-                        "args": [[None], {
-                            "frame": {"duration": 0, "redraw": False},
-                            "mode": "immediate",
-                            "transition": {"duration": 0}
-                        }]
-                    }
-                ]
-            }]
+            showlegend=False
         )
 
         st.plotly_chart(fig_tunel, use_container_width=True)
