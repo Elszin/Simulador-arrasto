@@ -1,7 +1,6 @@
 import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
-import pandas as pd
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA
@@ -25,29 +24,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Presets de Veículos / Objetos
-PRESETS_VEICULOS = {
-    "Carro Popular (Hatch/Sedan)": {"cd": 0.32, "area": 2.2},
+# Presets separados por fluido
+PRESETS_AR = {
     "Carro Esportivo (Supercarro)": {"cd": 0.28, "area": 1.9},
-    "SUV / Caminhonete": {"cd": 0.40, "area": 2.8},
-    "Caminhão / Ônibus": {"cd": 0.80, "area": 8.0},
-    "Submarino / Lancha (Perfil Hidrodinâmico)": {"cd": 0.05, "area": 3.0},
-    "Ciclista em Pé": {"cd": 0.90, "area": 0.6}
+    "Caminhão / Ônibus": {"cd": 0.80, "area": 8.0}
 }
 
-def carregar_preset_a():
-    sel = st.session_state.preset_select_a
-    if sel in PRESETS_VEICULOS:
-        p = PRESETS_VEICULOS[sel]
-        st.session_state.cd_a = float(p["cd"])
-        st.session_state.area_a = float(p["area"])
-
-def carregar_preset_b():
-    sel = st.session_state.preset_select_b
-    if sel in PRESETS_VEICULOS:
-        p = PRESETS_VEICULOS[sel]
-        st.session_state.cd_b = float(p["cd"])
-        st.session_state.area_b = float(p["area"])
+PRESETS_AGUA = {
+    "Lancha Rápida": {"cd": 0.45, "area": 2.5},
+    "Submarino": {"cd": 0.05, "area": 4.0}
+}
 
 # ==========================================
 # BARRA LATERAL: PARÂMETROS AMBIENTAIS E FLUIDO
@@ -66,13 +52,14 @@ with st.sidebar:
         temp_k = temp_c + 273.15
         p_atm = 101325 * np.exp(-altitude / 8500)
         rho = p_atm / (287.058 * temp_k)
+        presets_atuais = PRESETS_AR
     else:
         st.markdown("**🌊 Propriedades da Água**")
         temp_agua_c = st.slider("Temperatura da Água (°C)", 0, 40, 20, 1, key="slider_temp_agua")
-        # Densidade real da água varia ligeiramente com a temperatura (~998 kg/m³ a 20°C)
         rho = 1000.0 - (temp_agua_c - 4)**2 / 150.0 
         altitude = 0
         temp_c = temp_agua_c
+        presets_atuais = PRESETS_AGUA
 
     st.caption(f"💡 Densidade Real ($\rho$): **{rho:.3f} kg/m³**")
 
@@ -85,18 +72,29 @@ with st.sidebar:
     st.write("---")
     comparar = st.toggle("🔀 Modo Comparativo (Objeto B)", value=False, key="toggle_comparar")
 
-# ==========================================
-# INICIALIZAÇÃO DE ESTADO
-# ==========================================
-if "cd_a" not in st.session_state:
-    p_init = list(PRESETS_VEICULOS.values())[0]
-    st.session_state.cd_a = float(p_init["cd"])
-    st.session_state.area_a = float(p_init["area"])
+# Funções para atualizar os estados ao trocar de preset
+def carregar_preset_a():
+    sel = st.session_state.preset_select_a
+    if sel in presets_atuais:
+        p = presets_atuais[sel]
+        st.session_state.cd_a = float(p["cd"])
+        st.session_state.area_a = float(p["area"])
 
-if "cd_b" not in st.session_state:
-    p_init_b = list(PRESETS_VEICULOS.values())[1]
-    st.session_state.cd_b = float(p_init_b["cd"])
-    st.session_state.area_b = float(p_init_b["area"])
+def carregar_preset_b():
+    sel = st.session_state.preset_select_b
+    if sel in presets_atuais:
+        p = presets_atuais[sel]
+        st.session_state.cd_b = float(p["cd"])
+        st.session_state.area_b = float(p["area"])
+
+# Inicialização de estado segura
+keys_presets = list(presets_atuais.keys())
+if "cd_a" not in st.session_state or st.session_state.get("ultimo_fluido") != tipo_fluido:
+    st.session_state.cd_a = float(presets_atuais[keys_presets[0]]["cd"])
+    st.session_state.area_a = float(presets_atuais[keys_presets[0]]["area"])
+    st.session_state.cd_b = float(presets_atuais[keys_presets[1]]["cd"])
+    st.session_state.area_b = float(presets_atuais[keys_presets[1]]["area"])
+    st.session_state.ultimo_fluido = tipo_fluido
 
 # ==========================================
 # COLUNA DIREITA: AJUSTES DOS OBJETOS
@@ -107,12 +105,12 @@ with col_direita:
     st.markdown("### 📐 Parâmetros do Objeto")
     
     with st.expander("🔵 **Objeto A (Referência)**", expanded=True):
-        st.selectbox("Modelo Base:", list(PRESETS_VEICULOS.keys()), key="preset_select_a", on_change=carregar_preset_a)
+        st.selectbox("Modelo Base:", keys_presets, key="preset_select_a", on_change=carregar_preset_a)
         
-        cd_a = st.slider("C_d (Coef. de Arrasto):", 0.01, 1.40, st.session_state.cd_a, 0.01, key="cd_a")
-        area_a = st.slider("Área Frontal (m²):", 0.2, 15.0, st.session_state.area_a, 0.1, key="area_a")
+        cd_a = st.slider("C_d (Coef. de Arrasto):", 0.01, 1.40, st.session_state.get("cd_a", keys_presets[0]), 0.01, key="cd_a")
+        area_a = st.slider("Área Frontal (m²):", 0.2, 15.0, st.session_state.get("area_a", keys_presets[0]), 0.1, key="area_a")
         
-        usar_aerofolio = st.checkbox("➕ Adicionar Aerofólio / Asa", key="check_asa_a")
+        usar_aerofolio = st.checkbox("➕ Adicionar Aerofólio / Asa", key="check_asa_a") if tipo_fluido == "Ar (Atmosfera)" else False
         if usar_aerofolio:
             cl_a = st.slider("C_L (Downforce/Lift):", 0.1, 2.0, 0.8, 0.1, key="cl_asa_a")
             area_asa_a = st.slider("Área da Asa (m²):", 0.1, 2.0, 0.4, 0.1, key="area_asa_a")
@@ -122,10 +120,10 @@ with col_direita:
 
     if comparar:
         with st.expander("🔴 **Objeto B (Comparativo)**", expanded=False):
-            st.selectbox("Modelo Base:", list(PRESETS_VEICULOS.keys()), key="preset_select_b", on_change=carregar_preset_b)
+            st.selectbox("Modelo Base:", keys_presets, key="preset_select_b", on_change=carregar_preset_b)
             
-            cd_b = st.slider("C_d (Coef. de Arrasto):", 0.01, 1.40, st.session_state.cd_b, 0.01, key="cd_b")
-            area_b = st.slider("Área Frontal (m²):", 0.2, 15.0, st.session_state.area_b, 0.1, key="area_b")
+            cd_b = st.slider("C_d (Coef. de Arrasto):", 0.01, 1.40, st.session_state.get("cd_b", keys_presets[1]), 0.01, key="cd_b")
+            area_b = st.slider("Área Frontal (m²):", 0.2, 15.0, st.session_state.get("area_b", keys_presets[1]), 0.1, key="area_b")
             cl_b, area_asa_b, cd_induzido_asa_b = 0.0, 0.0, 0.0
 
 # ==========================================
