@@ -213,7 +213,7 @@ with col_centro:
     
     tab_grafico, tab_desenho = st.tabs([
         "📊 Curvas de Desempenho", 
-        "🌀 Visualização do Escoamento (Túnel Estático)"
+        "🌀 Visualização do Escoamento Reativo"
     ])
 
     # TAB 1: CURVAS DE DESEMPENHO
@@ -235,10 +235,10 @@ with col_centro:
         fig.update_layout(xaxis_title="Velocidade (km/h)", yaxis_title="Força de Arrasto (N)", template="plotly_white", height=400)
         st.plotly_chart(fig, use_container_width=True)
 
-    # TAB 2: TÚNEL DE VENTO ESTÁTICO (MAIS SIMPLES E LEVE)
+    # TAB 2: TÚNEL DE VENTO REATIVO AOS COEFICIENTES
     with tab_desenho:
-        st.markdown("#### 🌀 Linhas de Escoamento Estáticas")
-        st.caption(f"🌡 **{temp_c}°C** ($\rho$: **{rho:.3f} kg/m³**) | 💨 Velocidade do Vento: **{v_efetiva_ms*3.6:.1f} km/h**")
+        st.markdown("#### 🌀 Linhas de Escoamento Reativas ao Coeficiente")
+        st.caption(f"🌡 **{temp_c}°C** ($\rho$: **{rho:.3f} kg/m³**) | $C_d$ atual: **{cd_a:.2f}** | Vento: **{v_efetiva_ms*3.6:.1f} km/h**")
 
         tipo_veiculo_a = PRESETS_VEICULOS[modelo_a]["tipo"]
         altura_a = np.sqrt(area_a) * 0.95
@@ -246,33 +246,37 @@ with col_centro:
         
         fig_tunel = go.Figure()
 
-        # Desenhar linhas de fluxo simplificadas (linhas horizontais que curvam ao passar por cima do carro)
-        x_linhas = np.linspace(-comprimento_a * 1.5, comprimento_a * 1.5, 50)
-        y_niveis = np.linspace(0.1, altura_a * 2.0, 10)
+        x_linhas = np.linspace(-comprimento_a * 1.8, comprimento_a * 1.5, 60)
+        y_niveis = np.linspace(0.05, altura_a * 2.2, 12)
 
         for y0 in y_niveis:
-            # Desvio simulado leve baseado na altura do carro
-            desvio = (altura_a * 0.5) / (1.0 + (x_linhas / (comprimento_a * 0.5))**2) if y0 < altura_a * 1.2 else 0
-            y_linha = np.full_like(x_linhas, y0) + desvio * max(0, (1 - y0/(altura_a*1.5)))
+            fator_perturbacao = cd_a * (altura_a * 0.6)
+            desvio = fator_perturbacao * np.exp(-((x_linhas + comprimento_a*0.05) / (comprimento_a * 0.6))**2)
             
+            if y0 < altura_a * 0.5:
+                y_linha = np.full_like(x_linhas, y0) - desvio * max(0, (1 - y0/(altura_a*0.6)))
+            else:
+                y_linha = np.full_like(x_linhas, y0) + desvio * max(0, (1 - y0/(altura_a*1.8)))
+            
+            cor_intensidade = '#00D2FF' if cd_a < 0.4 else ('#FFD700' if cd_a < 0.6 else '#FF2A6D')
+
             fig_tunel.add_trace(go.Scatter(
                 x=x_linhas, y=y_linha,
                 mode='lines',
-                line=dict(color='#00D2FF', width=2),
+                line=dict(color=cor_intensidade, width=2),
                 showlegend=False,
                 hoverinfo='skip'
             ))
 
-        # Silhueta do Veículo
         fig_tunel.add_trace(go.Scatter(
             x=x_carro, y=y_carro,
             fill='toself', fillcolor='rgba(25, 28, 36, 0.95)',
-            line=dict(color='#FF2A6D', width=3), name='Veículo A'
+            line=dict(color='#00D2FF', width=3), name='Veículo A'
         ))
 
-        # Seta indicando a força de arrasto
+        vec_scale = 0.002
         fig_tunel.add_annotation(
-            x=comprimento_a/2 + (fd_a * 0.002), y=altura_a*0.5, ax=comprimento_a/2, ay=altura_a*0.5,
+            x=comprimento_a/2 + (fd_a * vec_scale), y=altura_a*0.5, ax=comprimento_a/2, ay=altura_a*0.5,
             xref="x", yref="y", axref="x", ayref="y",
             showarrow=True, arrowhead=3, arrowsize=1.5, arrowwidth=3, arrowcolor="#FF2A6D",
             text=f"Fd = {fd_a:.0f} N"
@@ -280,8 +284,8 @@ with col_centro:
 
         fig_tunel.update_layout(
             template="plotly_dark", height=450,
-            xaxis=dict(range=[-comprimento_a*1.5, comprimento_a*1.5], title="Comprimento (m)"),
-            yaxis=dict(range=[-0.1, altura_a*2.2], title="Altura (m)"),
+            xaxis=dict(range=[-comprimento_a*1.8, comprimento_a*1.5], title="Comprimento (m)"),
+            yaxis=dict(range=[-0.1, altura_a*2.5], title="Altura (m)"),
             showlegend=False
         )
 
