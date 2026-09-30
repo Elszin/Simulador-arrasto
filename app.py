@@ -8,7 +8,7 @@ import pandas as pd
 # ==========================================
 st.set_page_config(
     page_title="Simulador de Aerodinâmica",
-    page_icon="🏎️",
+    page_icon="🏎️️",
     layout="wide"
 )
 
@@ -47,7 +47,7 @@ def gerar_silhueta_veiculo(tipo, comprimento, altura):
     elif tipo == "suv":
         x = -1 * np.array([-0.50, -0.48, -0.38, -0.18,  0.25,  0.45,  0.48,  0.50,  0.50, -0.50]) * L
         y = np.array([ 0.15,  0.55,  0.60,  0.98,  0.98,  0.90,  0.35,  0.15,  0.00,  0.00]) * H
-    elif tipo == "caminhao": # Ônibus / Caminhão com frente estilizada e para-brisa inclinado
+    elif type == "caminhao": # Ônibus / Caminhão com frente estilizada e para-brisa inclinado
         x = -1 * np.array([-0.50, -0.48, -0.40, -0.25,  0.42,  0.48,  0.50,  0.50, -0.50]) * L
         y = np.array([ 0.12,  0.85,  0.98,  0.98,  0.98,  0.85,  0.30,  0.00,  0.00]) * H
     elif tipo == "ciclista":
@@ -209,12 +209,24 @@ with col_centro:
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=v_vec, y=fd_vec_a, mode='lines', name='Objeto A', line=dict(color='#00D2FF', width=3)))
-        fig.add_trace(go.Scatter(x=[v_kmh], y=[fd_a], mode='markers', name='Ponto Atual A', marker=dict(color='#00D2FF', size=10)))
+        fig.add_trace(go.Scatter(x=[v_kmh], y=[fd_a], mode='markers', name='Ponto Atual A', marker=dict(color='#00D2FF', size=12)))
+
+        # Linhas tracejadas projetando o Ponto A nos eixos X e Y
+        fig.add_shape(type="line", x0=v_kmh, y0=0, x1=v_kmh, y1=fd_a,
+                      line=dict(color="#00D2FF", width=1.5, dash="dash"))
+        fig.add_shape(type="line", x0=0, y0=fd_a, x1=v_kmh, y1=fd_a,
+                      line=dict(color="#00D2FF", width=1.5, dash="dash"))
 
         if comparar:
             fd_vec_b = 0.5 * rho * (v_vec_ef ** 2) * cd_b * area_b
             fig.add_trace(go.Scatter(x=v_vec, y=fd_vec_b, mode='lines', name='Objeto B', line=dict(color='#FF2A6D', width=3)))
-            fig.add_trace(go.Scatter(x=[v_kmh], y=[fd_b], mode='markers', name='Ponto Atual B', marker=dict(color='#FF2A6D', size=10)))
+            fig.add_trace(go.Scatter(x=[v_kmh], y=[fd_b], mode='markers', name='Ponto Atual B', marker=dict(color='#FF2A6D', size=12)))
+
+            # Linhas tracejadas projetando o Ponto B nos eixos X e Y
+            fig.add_shape(type="line", x0=v_kmh, y0=0, x1=v_kmh, y1=fd_b,
+                          line=dict(color="#FF2A6D", width=1.5, dash="dash"))
+            fig.add_shape(type="line", x0=0, y0=fd_b, x1=v_kmh, y1=fd_b,
+                          line=dict(color="#FF2A6D", width=1.5, dash="dash"))
 
         fig.update_layout(xaxis_title="Velocidade (km/h)", yaxis_title="Força de Arrasto (N)", template="plotly_white", height=400)
         st.plotly_chart(fig, use_container_width=True)
