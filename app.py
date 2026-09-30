@@ -7,8 +7,8 @@ import pandas as pd
 # 1. CONFIGURAÇÃO DA PÁGINA
 # ==========================================
 st.set_page_config(
-    page_title="Simulador de Aerodinâmica",
-    page_icon="🏎",
+    page_title="Simulador de Aerodinâmica e Hidrodinâmica",
+    page_icon="🌊",
     layout="wide"
 )
 
@@ -25,12 +25,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Presets de Veículos Terrestres (Apenas Coeficiente de Arrasto e Área Frontal)
+# Presets de Veículos / Objetos
 PRESETS_VEICULOS = {
     "Carro Popular (Hatch/Sedan)": {"cd": 0.32, "area": 2.2},
     "Carro Esportivo (Supercarro)": {"cd": 0.28, "area": 1.9},
     "SUV / Caminhonete": {"cd": 0.40, "area": 2.8},
     "Caminhão / Ônibus": {"cd": 0.80, "area": 8.0},
+    "Submarino / Lancha (Perfil Hidrodinâmico)": {"cd": 0.05, "area": 3.0},
     "Ciclista em Pé": {"cd": 0.90, "area": 0.6}
 }
 
@@ -49,24 +50,37 @@ def carregar_preset_b():
         st.session_state.area_b = float(p["area"])
 
 # ==========================================
-# BARRA LATERAL: PARÂMETROS AMBIENTAIS
+# BARRA LATERAL: PARÂMETROS AMBIENTAIS E FLUIDO
 # ==========================================
 with st.sidebar:
-    st.markdown("### ⚙️ Configurações do Teste")
+    st.markdown("### ⚙️ Configurações do Fluido")
     st.write("---")
     
-    st.markdown("**🏔️ Altitude & Atmosfera**")
-    altitude = st.slider("Altitude (m)", 0, 5000, 0, 100, key="slider_altitude_custom")
-    temp_c = st.slider("Temperatura do Ar (°C)", -10, 50, 20, 1, key="slider_temp")
+    tipo_fluido = st.selectbox("Escolha o Meio (Fluido):", ["Ar (Atmosfera)", "Água (Líquido)"])
     
-    temp_k = temp_c + 273.15
-    p_atm = 101325 * np.exp(-altitude / 8500)
-    rho = p_atm / (287.058 * temp_k)
-    st.caption(f"💡 Densidade do Ar ($\rho$): **{rho:.3f} kg/m³**")
+    if tipo_fluido == "Ar (Atmosfera)":
+        st.markdown("**🏔️ Altitude & Atmosfera**")
+        altitude = st.slider("Altitude (m)", 0, 5000, 0, 100, key="slider_altitude")
+        temp_c = st.slider("Temperatura do Ar (°C)", -10, 50, 20, 1, key="slider_temp")
+        
+        temp_k = temp_c + 273.15
+        p_atm = 101325 * np.exp(-altitude / 8500)
+        rho = p_atm / (287.058 * temp_k)
+    else:
+        st.markdown("**🌊 Propriedades da Água**")
+        temp_agua_c = st.slider("Temperatura da Água (°C)", 0, 40, 20, 1, key="slider_temp_agua")
+        # Densidade real da água varia ligeiramente com a temperatura (~998 kg/m³ a 20°C)
+        rho = 1000.0 - (temp_agua_c - 4)**2 / 150.0 
+        altitude = 0
+        temp_c = temp_agua_c
+
+    st.caption(f"💡 Densidade Real ($\rho$): **{rho:.3f} kg/m³**")
 
     st.write("---")
-    v_kmh = st.slider("Velocidade do Veículo (km/h)", 10.0, 220.0, 110.0, 5.0, key="slider_v_kmh")
-    v_vento_kmh = st.slider("Vento Frontal (+Contra / -Favor) (km/h)", -40.0, 40.0, 0.0, 5.0, key="slider_v_vento")
+    v_max_slider = 250.0 if tipo_fluido == "Ar (Atmosfera)" else 50.0
+    v_default = 110.0 if tipo_fluido == "Ar (Atmosfera)" else 15.0
+    v_kmh = st.slider("Velocidade do Objeto (km/h)", 1.0, v_max_slider, v_default, 1.0, key="slider_v_kmh")
+    v_vento_kmh = st.slider("Correnteza / Vento Frontal (km/h)", -30.0, 30.0, 0.0, 1.0, key="slider_v_vento")
 
     st.write("---")
     comparar = st.toggle("🔀 Modo Comparativo (Objeto B)", value=False, key="toggle_comparar")
@@ -90,17 +104,17 @@ if "cd_b" not in st.session_state:
 col_centro, col_direita = st.columns([2.2, 1], gap="medium")
 
 with col_direita:
-    st.markdown("### 📐 Parâmetros do Veículo")
+    st.markdown("### 📐 Parâmetros do Objeto")
     
     with st.expander("🔵 **Objeto A (Referência)**", expanded=True):
         st.selectbox("Modelo Base:", list(PRESETS_VEICULOS.keys()), key="preset_select_a", on_change=carregar_preset_a)
         
-        cd_a = st.slider("C_d (Coef. de Arrasto):", 0.15, 1.20, st.session_state.cd_a, 0.01, key="cd_a")
-        area_a = st.slider("Área Frontal (m²):", 0.5, 10.0, st.session_state.area_a, 0.1, key="area_a")
+        cd_a = st.slider("C_d (Coef. de Arrasto):", 0.01, 1.40, st.session_state.cd_a, 0.01, key="cd_a")
+        area_a = st.slider("Área Frontal (m²):", 0.2, 15.0, st.session_state.area_a, 0.1, key="area_a")
         
-        usar_aerofolio = st.checkbox("➕ Adicionar Aerofólio", key="check_asa_a")
+        usar_aerofolio = st.checkbox("➕ Adicionar Aerofólio / Asa", key="check_asa_a")
         if usar_aerofolio:
-            cl_a = st.slider("C_L (Downforce):", 0.1, 2.0, 0.8, 0.1, key="cl_asa_a")
+            cl_a = st.slider("C_L (Downforce/Lift):", 0.1, 2.0, 0.8, 0.1, key="cl_asa_a")
             area_asa_a = st.slider("Área da Asa (m²):", 0.1, 2.0, 0.4, 0.1, key="area_asa_a")
             cd_induzido_asa_a = (cl_a ** 2) / (np.pi * 3.5)
         else:
@@ -110,12 +124,12 @@ with col_direita:
         with st.expander("🔴 **Objeto B (Comparativo)**", expanded=False):
             st.selectbox("Modelo Base:", list(PRESETS_VEICULOS.keys()), key="preset_select_b", on_change=carregar_preset_b)
             
-            cd_b = st.slider("C_d (Coef. de Arrasto):", 0.15, 1.20, st.session_state.cd_b, 0.01, key="cd_b")
-            area_b = st.slider("Área Frontal (m²):", 0.5, 10.0, st.session_state.area_b, 0.1, key="area_b")
+            cd_b = st.slider("C_d (Coef. de Arrasto):", 0.01, 1.40, st.session_state.cd_b, 0.01, key="cd_b")
+            area_b = st.slider("Área Frontal (m²):", 0.2, 15.0, st.session_state.area_b, 0.1, key="area_b")
             cl_b, area_asa_b, cd_induzido_asa_b = 0.0, 0.0, 0.0
 
 # ==========================================
-# CÁLCULOS FÍSICOS (ESTRITAMENTE ARRASTO)
+# CÁLCULOS FÍSICOS (FORÇA DE ARRASTO)
 # ==========================================
 v_efetiva_ms = max(0.0, v_kmh + v_vento_kmh) / 3.6
 
@@ -132,27 +146,27 @@ if comparar:
 # DASHBOARD PRINCIPAL
 # ==========================================
 with col_centro:
-    st.markdown('<p class="main-title">🏎️ Simulador de Força de Arrasto</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-title">🌊 Simulador de Força de Arrasto (Ar & Água)</p>', unsafe_allow_html=True)
     
     # Exibição da Fórmula em Destaque no Topo
     st.markdown("---")
     st.markdown("📌 **Fórmula da Força de Arrasto ($F_d$):**")
     st.latex(r"F_d = \frac{1}{2} \cdot \rho \cdot v^2 \cdot C_d \cdot A")
-    st.caption("Onde: $\\rho$ = Densidade do ar | $v$ = Velocidade efetiva | $C_d$ = Coeficiente de arrasto | $A$ = Área frontal")
+    st.caption("Onde: $\\rho$ = Densidade do fluido | $v$ = Velocidade efetiva | $C_d$ = Coeficiente de arrasto | $A$ = Área frontal")
     st.markdown("---")
 
     m1, m2 = st.columns(2)
-    m1.metric("Força de Arrasto (Fd) - Objeto A", f"{fd_a:.1f} N")
+    m1.metric("Força de Arrasto (Fd) - Objeto A", f"{fd_a:,.1f} N".replace(",", "."))
     if comparar:
-        m2.metric("Força de Arrasto (Fd) - Objeto B", f"{fd_b:.1f} N")
+        m2.metric("Força de Arrasto (Fd) - Objeto B", f"{fd_b:,.1f} N".replace(",", "."))
     else:
-        m2.metric("Densidade do Ar ($\rho$)", f"{rho:.3f} kg/m³")
+        m2.metric(f"Densidade do Meio ({tipo_fluido.split()[0]})", f"{rho:.3f} kg/m³")
 
     st.write("---")
-    st.markdown("#### 📊 Curva de Desempenho Aerodinâmico")
+    st.markdown("#### 📊 Curva de Desempenho do Arrasto")
 
     # Gráfico Dinâmico Baseado na Velocidade
-    v_max_grafico = max(40.0, v_kmh + 15.0)
+    v_max_grafico = max(10.0, v_kmh + 10.0)
     v_vec = np.linspace(0, v_max_grafico, 100)
     v_vec_ef = np.maximum(0.1, v_vec + v_vento_kmh) / 3.6
     
