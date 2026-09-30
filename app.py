@@ -8,7 +8,7 @@ import pandas as pd
 # ==========================================
 st.set_page_config(
     page_title="Simulador de Aerodinâmica",
-    page_icon="🏎️️",
+    page_icon="🏎️",
     layout="wide"
 )
 
@@ -47,7 +47,7 @@ def gerar_silhueta_veiculo(tipo, comprimento, altura):
     elif tipo == "suv":
         x = -1 * np.array([-0.50, -0.48, -0.38, -0.18,  0.25,  0.45,  0.48,  0.50,  0.50, -0.50]) * L
         y = np.array([ 0.15,  0.55,  0.60,  0.98,  0.98,  0.90,  0.35,  0.15,  0.00,  0.00]) * H
-    elif type == "caminhao": # Ônibus / Caminhão com frente estilizada e para-brisa inclinado
+    elif tipo == "caminhao": 
         x = -1 * np.array([-0.50, -0.48, -0.40, -0.25,  0.42,  0.48,  0.50,  0.50, -0.50]) * L
         y = np.array([ 0.12,  0.85,  0.98,  0.98,  0.98,  0.85,  0.30,  0.00,  0.00]) * H
     elif tipo == "ciclista":
@@ -202,7 +202,9 @@ with col_centro:
 
     # TAB 1: CURVAS DE DESEMPENHO
     with tab_grafico:
-        v_vec = np.linspace(10, 220, 100)
+        # A curva agora termina logo um pouquinho à frente da velocidade atual escolhida (ex: +15 km/h ou no mínimo 40 km/h)
+        v_max_grafico = max(40.0, v_kmh + 15.0)
+        v_vec = np.linspace(0, v_max_grafico, 100)
         v_vec_ef = np.maximum(0.1, v_vec + v_vento_kmh) / 3.6
         
         fd_vec_a = (0.5 * rho * (v_vec_ef ** 2) * cd_a * area_a) + (0.5 * rho * (v_vec_ef ** 2) * cd_induzido_asa_a * area_asa_a if usar_aerofolio else 0.0)
@@ -228,7 +230,13 @@ with col_centro:
             fig.add_shape(type="line", x0=0, y0=fd_b, x1=v_kmh, y1=fd_b,
                           line=dict(color="#FF2A6D", width=1.5, dash="dash"))
 
-        fig.update_layout(xaxis_title="Velocidade (km/h)", yaxis_title="Força de Arrasto (N)", template="plotly_white", height=400)
+        # Ajusta os limites do eixo X dinamicamente para acompanhar a curva terminando logo à frente do ponto
+        fig.update_layout(
+            xaxis=dict(range=[0, v_max_grafico], title="Velocidade (km/h)"),
+            yaxis=dict(title="Força de Arrasto (N)"),
+            template="plotly_white", 
+            height=400
+        )
         st.plotly_chart(fig, use_container_width=True)
 
     # TAB 2: TÚNEL DE VENTO REATIVO AOS COEFICIENTES
