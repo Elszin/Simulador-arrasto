@@ -97,14 +97,13 @@ with st.sidebar:
     st.markdown("**🏔️ Altitude & Atmosfera**")
     cidade_preset = st.selectbox("Presets de Altitude:", list(CIDADES_ALTITUDE.keys()), index=0, key="select_cidade_alt")
     
-    is_custom = (cidade_preset == "Personalizado")
-    if not is_custom:
-        val_alt = CIDADES_ALTITUDE[cidade_preset]
-        altitude = st.slider("Altitude (m)", 0, 5000, val_alt, 100, disabled=True, key="slider_altitude_preset")
+    if cidade_preset != "Personalizado":
+        altitude = CIDADES_ALTITUDE[cidade_preset]
+        st.slider("Altitude (m)", 0, 5000, altitude, 100, disabled=True, key="slider_altitude_preset")
     else:
         altitude = st.slider("Altitude Personalizada (m)", 0, 5000, 0, 100, disabled=False, key="slider_altitude_custom")
     
-    temp_c = st.slider("Temperatura do Ar (°C)", -10, 50, 20, 1, key="slider_temp")
+    temp_c = st.slider("Temperatura do Air (°C)", -10, 50, 20, 1, key="slider_temp")
     
     temp_k = temp_c + 273.15
     p_atm = 101325 * np.exp(-altitude / 8500)
