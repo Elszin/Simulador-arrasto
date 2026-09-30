@@ -8,7 +8,7 @@ import pandas as pd
 # ==========================================
 st.set_page_config(
     page_title="Simulador de Aerodinâmica",
-    page_icon="🏎️️",
+    page_icon="🏎",
     layout="wide"
 )
 
@@ -25,39 +25,14 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Presets de Veículos Terrestres
+# Presets de Veículos Terrestres (Apenas Coeficiente de Arrasto e Área Frontal)
 PRESETS_VEICULOS = {
-    "Carro Popular (Hatch/Sedan)": {"cd": 0.32, "area": 2.2, "comprimento": 4.0, "tipo": "hatch"},
-    "Carro Esportivo (Supercarro)": {"cd": 0.28, "area": 1.9, "comprimento": 4.5, "tipo": "esportivo"},
-    "SUV / Caminhonete": {"cd": 0.40, "area": 2.8, "comprimento": 4.8, "tipo": "suv"},
-    "Caminhão / Ônibus": {"cd": 0.80, "area": 8.0, "comprimento": 12.0, "tipo": "caminhao"},
-    "Ciclista em Pé": {"cd": 0.90, "area": 0.6, "comprimento": 1.5, "tipo": "ciclista"}
+    "Carro Popular (Hatch/Sedan)": {"cd": 0.32, "area": 2.2},
+    "Carro Esportivo (Supercarro)": {"cd": 0.28, "area": 1.9},
+    "SUV / Caminhonete": {"cd": 0.40, "area": 2.8},
+    "Caminhão / Ônibus": {"cd": 0.80, "area": 8.0},
+    "Ciclista em Pé": {"cd": 0.90, "area": 0.6}
 }
-
-# ==========================================
-# FUNÇÃO SILHUETA (FRENTE VIRADA PARA A ESQUERDA -X)
-# ==========================================
-def gerar_silhueta_veiculo(tipo, comprimento, altura):
-    L = comprimento
-    H = altura
-    
-    if tipo == "esportivo":
-        x = -1 * np.array([-0.50, -0.48, -0.35, -0.10,  0.15,  0.40,  0.48,  0.50,  0.50, -0.50]) * L
-        y = np.array([ 0.15,  0.30,  0.40,  0.95,  0.85,  0.50,  0.35,  0.15,  0.00,  0.00]) * H
-    elif tipo == "suv":
-        x = -1 * np.array([-0.50, -0.48, -0.38, -0.18,  0.25,  0.45,  0.48,  0.50,  0.50, -0.50]) * L
-        y = np.array([ 0.15,  0.55,  0.60,  0.98,  0.98,  0.90,  0.35,  0.15,  0.00,  0.00]) * H
-    elif tipo == "caminhao": 
-        x = -1 * np.array([-0.50, -0.48, -0.40, -0.25,  0.42,  0.48,  0.50,  0.50, -0.50]) * L
-        y = np.array([ 0.12,  0.85,  0.98,  0.98,  0.98,  0.85,  0.30,  0.00,  0.00]) * H
-    elif tipo == "ciclista":
-        x = -1 * np.array([-0.40, -0.30, -0.15,  0.05,  0.25,  0.35,  0.25,  0.00, -0.25, -0.40]) * L
-        y = np.array([ 0.30,  0.70,  0.95,  0.85,  0.60,  0.25,  0.05,  0.05,  0.05,  0.30]) * H
-    else:  # Hatch / Sedan
-        x = -1 * np.array([-0.50, -0.47, -0.32, -0.12,  0.20,  0.38,  0.47,  0.50,  0.50, -0.50]) * L
-        y = np.array([ 0.15,  0.45,  0.52,  0.96,  0.94,  0.60,  0.30,  0.15,  0.00,  0.00]) * H
-        
-    return x, y
 
 def carregar_preset_a():
     sel = st.session_state.preset_select_a
@@ -65,7 +40,6 @@ def carregar_preset_a():
         p = PRESETS_VEICULOS[sel]
         st.session_state.cd_a = float(p["cd"])
         st.session_state.area_a = float(p["area"])
-        st.session_state.comp_a = float(p["comprimento"])
 
 def carregar_preset_b():
     sel = st.session_state.preset_select_b
@@ -73,7 +47,6 @@ def carregar_preset_b():
         p = PRESETS_VEICULOS[sel]
         st.session_state.cd_b = float(p["cd"])
         st.session_state.area_b = float(p["area"])
-        st.session_state.comp_b = float(p["comprimento"])
 
 # ==========================================
 # BARRA LATERAL: PARÂMETROS AMBIENTAIS
@@ -99,34 +72,31 @@ with st.sidebar:
     comparar = st.toggle("🔀 Modo Comparativo (Objeto B)", value=False, key="toggle_comparar")
 
 # ==========================================
-# COLUNAS DA INTERFACE PRINCIPAL
+# INICIALIZAÇÃO DE ESTADO
 # ==========================================
-col_centro, col_direita = st.columns([2.2, 1], gap="medium")
-
 if "cd_a" not in st.session_state:
     p_init = list(PRESETS_VEICULOS.values())[0]
     st.session_state.cd_a = float(p_init["cd"])
     st.session_state.area_a = float(p_init["area"])
-    st.session_state.comp_a = float(p_init["comprimento"])
 
 if "cd_b" not in st.session_state:
     p_init_b = list(PRESETS_VEICULOS.values())[1]
     st.session_state.cd_b = float(p_init_b["cd"])
     st.session_state.area_b = float(p_init_b["area"])
-    st.session_state.comp_b = float(p_init_b["comprimento"])
 
 # ==========================================
 # COLUNA DIREITA: AJUSTES DOS OBJETOS
 # ==========================================
+col_centro, col_direita = st.columns([2.2, 1], gap="medium")
+
 with col_direita:
-    st.markdown("### 📐 Geometria do Veículo")
+    st.markdown("### 📐 Parâmetros do Veículo")
     
     with st.expander("🔵 **Objeto A (Referência)**", expanded=True):
-        modelo_a = st.selectbox("Modelo Base:", list(PRESETS_VEICULOS.keys()), key="preset_select_a", on_change=carregar_preset_a)
+        st.selectbox("Modelo Base:", list(PRESETS_VEICULOS.keys()), key="preset_select_a", on_change=carregar_preset_a)
         
         cd_a = st.slider("C_d (Coef. de Arrasto):", 0.15, 1.20, st.session_state.cd_a, 0.01, key="cd_a")
         area_a = st.slider("Área Frontal (m²):", 0.5, 10.0, st.session_state.area_a, 0.1, key="area_a")
-        comprimento_a = st.number_input("Comprimento (m):", value=st.session_state.comp_a, step=0.5, key="comp_a")
         
         usar_aerofolio = st.checkbox("➕ Adicionar Aerofólio", key="check_asa_a")
         if usar_aerofolio:
@@ -138,15 +108,14 @@ with col_direita:
 
     if comparar:
         with st.expander("🔴 **Objeto B (Comparativo)**", expanded=False):
-            modelo_b = st.selectbox("Modelo Base:", list(PRESETS_VEICULOS.keys()), key="preset_select_b", on_change=carregar_preset_b)
+            st.selectbox("Modelo Base:", list(PRESETS_VEICULOS.keys()), key="preset_select_b", on_change=carregar_preset_b)
             
             cd_b = st.slider("C_d (Coef. de Arrasto):", 0.15, 1.20, st.session_state.cd_b, 0.01, key="cd_b")
             area_b = st.slider("Área Frontal (m²):", 0.5, 10.0, st.session_state.area_b, 0.1, key="area_b")
-            comprimento_b = st.number_input("Comprimento (m):", value=st.session_state.comp_b, step=0.5, key="comp_b")
             cl_b, area_asa_b, cd_induzido_asa_b = 0.0, 0.0, 0.0
 
 # ==========================================
-# CÁLCULOS FÍSICOS (APENAS ARRASTO)
+# CÁLCULOS FÍSICOS (ESTRITAMENTE ARRASTO)
 # ==========================================
 v_efetiva_ms = max(0.0, v_kmh + v_vento_kmh) / 3.6
 
@@ -163,7 +132,7 @@ if comparar:
 # DASHBOARD PRINCIPAL
 # ==========================================
 with col_centro:
-    st.markdown('<p class="main-title">🏎️ Simulador Aerodinâmico de Veículos</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-title">🏎️ Simulador de Força de Arrasto</p>', unsafe_allow_html=True)
     
     m1, m2 = st.columns(2)
     m1.metric("Força de Arrasto (Fd) - Objeto A", f"{fd_a:.1f} N")
@@ -173,101 +142,40 @@ with col_centro:
         m2.metric("Densidade do Ar ($\rho$)", f"{rho:.3f} kg/m³")
 
     st.write("---")
+    st.markdown("#### 📊 Curva de Desempenho Aerodinâmico")
+
+    # Gráfico Dinâmico Baseado na Velocidade
+    v_max_grafico = max(40.0, v_kmh + 15.0)
+    v_vec = np.linspace(0, v_max_grafico, 100)
+    v_vec_ef = np.maximum(0.1, v_vec + v_vento_kmh) / 3.6
     
-    tab_grafico, tab_desenho = st.tabs([
-        "📊 Curvas de Desempenho", 
-        "🌀 Visualização do Escoamento Reativo"
-    ])
+    fd_vec_a = (0.5 * rho * (v_vec_ef ** 2) * cd_a * area_a) + (0.5 * rho * (v_vec_ef ** 2) * cd_induzido_asa_a * area_asa_a if usar_aerofolio else 0.0)
 
-    # TAB 1: CURVAS DE DESEMPENHO
-    with tab_grafico:
-        v_max_grafico = max(40.0, v_kmh + 15.0)
-        v_vec = np.linspace(0, v_max_grafico, 100)
-        v_vec_ef = np.maximum(0.1, v_vec + v_vento_kmh) / 3.6
-        
-        fd_vec_a = (0.5 * rho * (v_vec_ef ** 2) * cd_a * area_a) + (0.5 * rho * (v_vec_ef ** 2) * cd_induzido_asa_a * area_asa_a if usar_aerofolio else 0.0)
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=v_vec, y=fd_vec_a, mode='lines', name='Objeto A', line=dict(color='#00D2FF', width=3)))
+    fig.add_trace(go.Scatter(x=[v_kmh], y=[fd_a], mode='markers', name='Ponto Atual A', marker=dict(color='#00D2FF', size=12)))
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=v_vec, y=fd_vec_a, mode='lines', name='Objeto A', line=dict(color='#00D2FF', width=3)))
-        fig.add_trace(go.Scatter(x=[v_kmh], y=[fd_a], mode='markers', name='Ponto Atual A', marker=dict(color='#00D2FF', size=12)))
+    # Linhas tracejadas de projeção do Objeto A
+    fig.add_shape(type="line", x0=v_kmh, y0=0, x1=v_kmh, y1=fd_a,
+                  line=dict(color="#00D2FF", width=1.5, dash="dash"))
+    fig.add_shape(type="line", x0=0, y0=fd_a, x1=v_kmh, y1=fd_a,
+                  line=dict(color="#00D2FF", width=1.5, dash="dash"))
 
-        # Linhas tracejadas projetando o Ponto A nos eixos X e Y
-        fig.add_shape(type="line", x0=v_kmh, y0=0, x1=v_kmh, y1=fd_a,
-                      line=dict(color="#00D2FF", width=1.5, dash="dash"))
-        fig.add_shape(type="line", x0=0, y0=fd_a, x1=v_kmh, y1=fd_a,
-                      line=dict(color="#00D2FF", width=1.5, dash="dash"))
+    if comparar:
+        fd_vec_b = 0.5 * rho * (v_vec_ef ** 2) * cd_b * area_b
+        fig.add_trace(go.Scatter(x=v_vec, y=fd_vec_b, mode='lines', name='Objeto B', line=dict(color='#FF2A6D', width=3)))
+        fig.add_trace(go.Scatter(x=[v_kmh], y=[fd_b], mode='markers', name='Ponto Atual B', marker=dict(color='#FF2A6D', size=12)))
 
-        if comparar:
-            fd_vec_b = 0.5 * rho * (v_vec_ef ** 2) * cd_b * area_b
-            fig.add_trace(go.Scatter(x=v_vec, y=fd_vec_b, mode='lines', name='Objeto B', line=dict(color='#FF2A6D', width=3)))
-            fig.add_trace(go.Scatter(x=[v_kmh], y=[fd_b], mode='markers', name='Ponto Atual B', marker=dict(color='#FF2A6D', size=12)))
+        # Linhas tracejadas de projeção do Objeto B
+        fig.add_shape(type="line", x0=v_kmh, y0=0, x1=v_kmh, y1=fd_b,
+                      line=dict(color="#FF2A6D", width=1.5, dash="dash"))
+        fig.add_shape(type="line", x0=0, y0=fd_b, x1=v_kmh, y1=fd_b,
+                      line=dict(color="#FF2A6D", width=1.5, dash="dash"))
 
-            # Linhas tracejadas projetando o Ponto B nos eixos X e Y
-            fig.add_shape(type="line", x0=v_kmh, y0=0, x1=v_kmh, y1=fd_b,
-                          line=dict(color="#FF2A6D", width=1.5, dash="dash"))
-            fig.add_shape(type="line", x0=0, y0=fd_b, x1=v_kmh, y1=fd_b,
-                          line=dict(color="#FF2A6D", width=1.5, dash="dash"))
-
-        fig.update_layout(
-            xaxis=dict(range=[0, v_max_grafico], title="Velocidade (km/h)"),
-            yaxis=dict(title="Força de Arrasto (N)"),
-            template="plotly_white", 
-            height=400
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    # TAB 2: TÚNEL DE VENTO REATIVO AOS COEFICIENTES
-    with tab_desenho:
-        st.markdown("#### 🌀 Linhas de Escoamento Reativas ao Coeficiente")
-        st.caption(f"🌡 **{temp_c}°C** ($\rho$: **{rho:.3f} kg/m³**) | $C_d$ atual: **{cd_a:.2f}** | Vento: **{v_efetiva_ms*3.6:.1f} km/h**")
-
-        tipo_veiculo_a = PRESETS_VEICULOS[modelo_a]["tipo"]
-        altura_a = np.sqrt(area_a) * 0.95
-        x_carro, y_carro = gerar_silhueta_veiculo(tipo_veiculo_a, comprimento_a, altura_a)
-        
-        fig_tunel = go.Figure()
-
-        x_linhas = np.linspace(-comprimento_a * 1.8, comprimento_a * 1.5, 60)
-        y_niveis = np.linspace(0.05, altura_a * 2.2, 12)
-
-        for y0 in y_niveis:
-            fator_perturbacao = cd_a * (altura_a * 0.6)
-            desvio = fator_perturbacao * np.exp(-((x_linhas + comprimento_a*0.05) / (comprimento_a * 0.6))**2)
-            
-            if y0 < altura_a * 0.5:
-                y_linha = np.full_like(x_linhas, y0) - desvio * max(0, (1 - y0/(altura_a*0.6)))
-            else:
-                y_linha = np.full_like(x_linhas, y0) + desvio * max(0, (1 - y0/(altura_a*1.8)))
-            
-            cor_intensidade = '#00D2FF' if cd_a < 0.4 else ('#FFD700' if cd_a < 0.6 else '#FF2A6D')
-
-            fig_tunel.add_trace(go.Scatter(
-                x=x_linhas, y=y_linha,
-                mode='lines',
-                line=dict(color=cor_intensidade, width=2),
-                showlegend=False,
-                hoverinfo='skip'
-            ))
-
-        fig_tunel.add_trace(go.Scatter(
-            x=x_carro, y=y_carro,
-            fill='toself', fillcolor='rgba(25, 28, 36, 0.95)',
-            line=dict(color='#00D2FF', width=3), name='Veículo A'
-        ))
-
-        vec_scale = 0.002
-        fig_tunel.add_annotation(
-            x=comprimento_a/2 + (fd_a * vec_scale), y=altura_a*0.5, ax=comprimento_a/2, ay=altura_a*0.5,
-            xref="x", yref="y", axref="x", ayref="y",
-            showarrow=True, arrowhead=3, arrowsize=1.5, arrowwidth=3, arrowcolor="#FF2A6D",
-            text=f"Fd = {fd_a:.0f} N"
-        )
-
-        fig_tunel.update_layout(
-            template="plotly_dark", height=450,
-            xaxis=dict(range=[-comprimento_a*1.8, comprimento_a*1.5], title="Comprimento (m)"),
-            yaxis=dict(range=[-0.1, altura_a*2.5], title="Altura (m)"),
-            showlegend=False
-        )
-
-        st.plotly_chart(fig_tunel, use_container_width=True)
+    fig.update_layout(
+        xaxis=dict(range=[0, v_max_grafico], title="Velocidade (km/h)"),
+        yaxis=dict(title="Força de Arrasto (N)"),
+        template="plotly_white", 
+        height=480
+    )
+    st.plotly_chart(fig, use_container_width=True)
