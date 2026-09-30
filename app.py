@@ -20,7 +20,7 @@ st.markdown("""
         background: -webkit-linear-gradient(45deg, #00D2FF, #FF2A6D);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -134,6 +134,13 @@ if comparar:
 with col_centro:
     st.markdown('<p class="main-title">🏎️ Simulador de Força de Arrasto</p>', unsafe_allow_html=True)
     
+    # Exibição da Fórmula em Destaque no Topo
+    st.markdown("---")
+    st.markdown("📌 **Fórmula da Força de Arrasto ($F_d$):**")
+    st.latex(r"F_d = \frac{1}{2} \cdot \rho \cdot v^2 \cdot C_d \cdot A")
+    st.caption("Onde: $\\rho$ = Densidade do ar | $v$ = Velocidade efetiva | $C_d$ = Coeficiente de arrasto | $A$ = Área frontal")
+    st.markdown("---")
+
     m1, m2 = st.columns(2)
     m1.metric("Força de Arrasto (Fd) - Objeto A", f"{fd_a:.1f} N")
     if comparar:
