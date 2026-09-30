@@ -8,7 +8,7 @@ import pandas as pd
 # 1. CONFIGURAÇÃO DA PÁGINA
 # ==========================================
 st.set_page_config(
-    page_title="Simulador de Aerodinâmica & Consumo",
+    page_title="Simulador de Aerodinâmica",
     page_icon="🏎️",
     layout="wide"
 )
@@ -113,10 +113,6 @@ with st.sidebar:
     st.caption(f"💡 Densidade do Ar ($\rho$): **{rho:.3f} kg/m³**")
 
     st.write("---")
-    st.markdown("**⛽ Motor & Operação**")
-    eficiencia_motor = st.slider("Eficiência Térmica do Motor (%)", 15, 45, 30, key="slider_efic_comb") / 100.0
-
-    st.write("---")
     v_kmh = st.slider("Velocidade do Veículo (km/h)", 10.0, 220.0, 110.0, 5.0, key="slider_v_kmh")
     v_vento_kmh = st.slider("Vento Frontal (+Contra / -Favor) (km/h)", -40.0, 40.0, 0.0, 5.0, key="slider_v_vento")
 
@@ -179,7 +175,7 @@ with col_direita:
             cl_b, area_asa_b, cd_induzido_asa_b = 0.0, 0.0, 0.0
 
 # ==========================================
-# CÁLCULOS FÍSICOS (MANTIDO O DA POTÊNCIA E CONSUMO)
+# CÁLCULOS FÍSICOS
 # ==========================================
 v_efetiva_ms = max(0.0, v_kmh + v_vento_kmh) / 3.6
 v_propria_ms = v_kmh / 3.6
@@ -198,9 +194,6 @@ pot_cv_a = pot_watts_a / 735.5
 
 downforce_a = 0.5 * rho * (v_efetiva_ms ** 2) * cl_a * area_asa_a
 
-consumo_l_h_a = (pot_watts_a / eficiencia_motor) / (32e6 / 3600) if v_kmh > 0 else 0
-consumo_1km_a = (consumo_l_h_a / v_kmh) if v_kmh > 0 else 0
-
 # Objeto B (se ativo)
 if comparar:
     fd_b = 0.5 * rho * (v_efetiva_ms ** 2) * cd_b * area_b
@@ -208,8 +201,6 @@ if comparar:
     f_total_b = fd_b + f_rol_b
     pot_watts_b = f_total_b * v_propria_ms
     pot_cv_b = pot_watts_b / 735.5
-    consumo_l_h_b = (pot_watts_b / eficiencia_motor) / (32e6 / 3600) if v_kmh > 0 else 0
-    consumo_1km_b = (consumo_l_h_b / v_kmh) if v_kmh > 0 else 0
 
 # ==========================================
 # DASHBOARD PRINCIPAL
@@ -217,11 +208,10 @@ if comparar:
 with col_centro:
     st.markdown('<p class="main-title">🏎️ Simulador Aerodinâmico de Veículos</p>', unsafe_allow_html=True)
     
-    # Métricas do Topo (Mantida a potência calculada)
-    m1, m2, m3 = st.columns(3)
+    # Apenas as duas métricas principais solicitadas
+    m1, m2 = st.columns(2)
     m1.metric("Força de Arrasto (Fd)", f"{fd_a:.1f} N")
     m2.metric("Potência Exigida", f"{pot_cv_a:.1f} CV")
-    m3.metric("Consumo Estimado", f"{consumo_1km_a * 100:.2f} L/100km")
 
     st.write("---")
     
