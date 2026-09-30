@@ -55,9 +55,9 @@ def gerar_silhueta_veiculo(tipo, comprimento, altura):
     elif tipo == "suv":
         x = -1 * np.array([-0.50, -0.48, -0.38, -0.18,  0.25,  0.45,  0.48,  0.50,  0.50, -0.50]) * L
         y = np.array([ 0.15,  0.55,  0.60,  0.98,  0.98,  0.90,  0.35,  0.15,  0.00,  0.00]) * H
-    elif tipo == "caminhao":
-        x = -1 * np.array([-0.50, -0.49, -0.48,  0.48,  0.49,  0.50,  0.50, -0.50]) * L
-        y = np.array([ 0.10,  0.95,  0.98,  0.98,  0.95,  0.10,  0.00,  0.00]) * H
+    elif tipo == "caminhao": # Ônibus / Caminhão com frente estilizada e para-brisa inclinado
+        x = -1 * np.array([-0.50, -0.48, -0.40, -0.25,  0.42,  0.48,  0.50,  0.50, -0.50]) * L
+        y = np.array([ 0.12,  0.85,  0.98,  0.98,  0.98,  0.85,  0.30,  0.00,  0.00]) * H
     elif tipo == "ciclista":
         x = -1 * np.array([-0.40, -0.30, -0.15,  0.05,  0.25,  0.35,  0.25,  0.00, -0.25, -0.40]) * L
         y = np.array([ 0.30,  0.70,  0.95,  0.85,  0.60,  0.25,  0.05,  0.05,  0.05,  0.30]) * H
