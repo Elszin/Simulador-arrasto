@@ -34,14 +34,6 @@ PRESETS_VEICULOS = {
     "Ciclista em Pé": {"cd": 0.90, "area": 0.6, "massa": 85.0, "potencia_cv": 0.4, "comprimento": 1.5, "tipo": "ciclista"}
 }
 
-CIDADES_ALTITUDE = {
-    "Personalizado": None,
-    "Nível do Mar (0 m)": 0,
-    "São Paulo / Curitiba (~800 m)": 800,
-    "Cidade do México (~2240 m)": 2240,
-    "La Paz - Bolívia (~3640 m)": 3640
-}
-
 # ==========================================
 # FUNÇÃO SILHUETA (FRENTE VIRADA PARA A ESQUERDA -X)
 # ==========================================
@@ -95,15 +87,8 @@ with st.sidebar:
     st.write("---")
     
     st.markdown("**🏔️ Altitude & Atmosfera**")
-    cidade_preset = st.selectbox("Presets de Altitude:", list(CIDADES_ALTITUDE.keys()), index=0, key="select_cidade_alt")
-    
-    if cidade_preset != "Personalizado":
-        altitude = CIDADES_ALTITUDE[cidade_preset]
-        st.slider("Altitude (m)", 0, 5000, altitude, 100, disabled=True, key="slider_altitude_preset")
-    else:
-        altitude = st.slider("Altitude Personalizada (m)", 0, 5000, 0, 100, disabled=False, key="slider_altitude_custom")
-    
-    temp_c = st.slider("Temperatura do Air (°C)", -10, 50, 20, 1, key="slider_temp")
+    altitude = st.slider("Altitude (m)", 0, 5000, 0, 100, key="slider_altitude_custom")
+    temp_c = st.slider("Temperatura do Ar (°C)", -10, 50, 20, 1, key="slider_temp")
     
     temp_k = temp_c + 273.15
     p_atm = 101325 * np.exp(-altitude / 8500)
