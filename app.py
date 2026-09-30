@@ -8,7 +8,7 @@ import pandas as pd
 # ==========================================
 st.set_page_config(
     page_title="Simulador de Aerodinâmica",
-    page_icon="🏎️",
+    page_icon="🏎️️",
     layout="wide"
 )
 
@@ -27,11 +27,11 @@ st.markdown("""
 
 # Presets de Veículos Terrestres
 PRESETS_VEICULOS = {
-    "Carro Popular (Hatch/Sedan)": {"cd": 0.32, "area": 2.2, "massa": 1100.0, "potencia_cv": 100.0, "comprimento": 4.0, "tipo": "hatch"},
-    "Carro Esportivo (Supercarro)": {"cd": 0.28, "area": 1.9, "massa": 1400.0, "potencia_cv": 450.0, "comprimento": 4.5, "tipo": "esportivo"},
-    "SUV / Caminhonete": {"cd": 0.40, "area": 2.8, "massa": 1900.0, "potencia_cv": 180.0, "comprimento": 4.8, "tipo": "suv"},
-    "Caminhão / Ônibus": {"cd": 0.80, "area": 8.0, "massa": 12000.0, "potencia_cv": 400.0, "comprimento": 12.0, "tipo": "caminhao"},
-    "Ciclista em Pé": {"cd": 0.90, "area": 0.6, "massa": 85.0, "potencia_cv": 0.4, "comprimento": 1.5, "tipo": "ciclista"}
+    "Carro Popular (Hatch/Sedan)": {"cd": 0.32, "area": 2.2, "comprimento": 4.0, "tipo": "hatch"},
+    "Carro Esportivo (Supercarro)": {"cd": 0.28, "area": 1.9, "comprimento": 4.5, "tipo": "esportivo"},
+    "SUV / Caminhonete": {"cd": 0.40, "area": 2.8, "comprimento": 4.8, "tipo": "suv"},
+    "Caminhão / Ônibus": {"cd": 0.80, "area": 8.0, "comprimento": 12.0, "tipo": "caminhao"},
+    "Ciclista em Pé": {"cd": 0.90, "area": 0.6, "comprimento": 1.5, "tipo": "ciclista"}
 }
 
 # ==========================================
@@ -65,8 +65,6 @@ def carregar_preset_a():
         p = PRESETS_VEICULOS[sel]
         st.session_state.cd_a = float(p["cd"])
         st.session_state.area_a = float(p["area"])
-        st.session_state.m_a = float(p["massa"])
-        st.session_state.p_a = float(p["potencia_cv"])
         st.session_state.comp_a = float(p["comprimento"])
 
 def carregar_preset_b():
@@ -75,8 +73,6 @@ def carregar_preset_b():
         p = PRESETS_VEICULOS[sel]
         st.session_state.cd_b = float(p["cd"])
         st.session_state.area_b = float(p["area"])
-        st.session_state.m_b = float(p["massa"])
-        st.session_state.p_b = float(p["potencia_cv"])
         st.session_state.comp_b = float(p["comprimento"])
 
 # ==========================================
@@ -111,16 +107,12 @@ if "cd_a" not in st.session_state:
     p_init = list(PRESETS_VEICULOS.values())[0]
     st.session_state.cd_a = float(p_init["cd"])
     st.session_state.area_a = float(p_init["area"])
-    st.session_state.m_a = float(p_init["massa"])
-    st.session_state.p_a = float(p_init["potencia_cv"])
     st.session_state.comp_a = float(p_init["comprimento"])
 
 if "cd_b" not in st.session_state:
     p_init_b = list(PRESETS_VEICULOS.values())[1]
     st.session_state.cd_b = float(p_init_b["cd"])
     st.session_state.area_b = float(p_init_b["area"])
-    st.session_state.m_b = float(p_init_b["massa"])
-    st.session_state.p_b = float(p_init_b["potencia_cv"])
     st.session_state.comp_b = float(p_init_b["comprimento"])
 
 # ==========================================
@@ -134,8 +126,6 @@ with col_direita:
         
         cd_a = st.slider("C_d (Coef. de Arrasto):", 0.15, 1.20, st.session_state.cd_a, 0.01, key="cd_a")
         area_a = st.slider("Área Frontal (m²):", 0.5, 10.0, st.session_state.area_a, 0.1, key="area_a")
-        massa_a = st.number_input("Massa (kg):", value=st.session_state.m_a, step=50.0, key="m_a")
-        potencia_cv_a = st.number_input("Potência Motor (CV):", value=st.session_state.p_a, step=10.0, key="p_a")
         comprimento_a = st.number_input("Comprimento (m):", value=st.session_state.comp_a, step=0.5, key="comp_a")
         
         usar_aerofolio = st.checkbox("➕ Adicionar Aerofólio", key="check_asa_a")
@@ -152,36 +142,22 @@ with col_direita:
             
             cd_b = st.slider("C_d (Coef. de Arrasto):", 0.15, 1.20, st.session_state.cd_b, 0.01, key="cd_b")
             area_b = st.slider("Área Frontal (m²):", 0.5, 10.0, st.session_state.area_b, 0.1, key="area_b")
-            massa_b = st.number_input("Massa (kg):", value=st.session_state.m_b, step=50.0, key="m_b")
-            potencia_cv_b = st.number_input("Potência Motor (CV):", value=st.session_state.p_b, step=10.0, key="p_b")
             comprimento_b = st.number_input("Comprimento (m):", value=st.session_state.comp_b, step=0.5, key="comp_b")
             cl_b, area_asa_b, cd_induzido_asa_b = 0.0, 0.0, 0.0
 
 # ==========================================
-# CÁLCULOS FÍSICOS
+# CÁLCULOS FÍSICOS (APENAS ARRASTO)
 # ==========================================
 v_efetiva_ms = max(0.0, v_kmh + v_vento_kmh) / 3.6
-v_propria_ms = v_kmh / 3.6
-crr = 0.012
 
 # Objeto A
 fd_corpo_a = 0.5 * rho * (v_efetiva_ms ** 2) * cd_a * area_a
 fd_asa_a = 0.5 * rho * (v_efetiva_ms ** 2) * cd_induzido_asa_a * area_asa_a if usar_aerofolio else 0.0
 fd_a = fd_corpo_a + fd_asa_a
 
-f_rol_a = crr * massa_a * 9.81
-f_total_a = fd_a + f_rol_a
-
-pot_watts_a = f_total_a * v_propria_ms
-pot_cv_a = pot_watts_a / 735.5
-
 # Objeto B (se ativo)
 if comparar:
     fd_b = 0.5 * rho * (v_efetiva_ms ** 2) * cd_b * area_b
-    f_rol_b = crr * massa_b * 9.81
-    f_total_b = fd_b + f_rol_b
-    pot_watts_b = f_total_b * v_propria_ms
-    pot_cv_b = pot_watts_b / 735.5
 
 # ==========================================
 # DASHBOARD PRINCIPAL
@@ -190,8 +166,11 @@ with col_centro:
     st.markdown('<p class="main-title">🏎️ Simulador Aerodinâmico de Veículos</p>', unsafe_allow_html=True)
     
     m1, m2 = st.columns(2)
-    m1.metric("Força de Arrasto (Fd)", f"{fd_a:.1f} N")
-    m2.metric("Potência Exigida", f"{pot_cv_a:.1f} CV")
+    m1.metric("Força de Arrasto (Fd) - Objeto A", f"{fd_a:.1f} N")
+    if comparar:
+        m2.metric("Força de Arrasto (Fd) - Objeto B", f"{fd_b:.1f} N")
+    else:
+        m2.metric("Densidade do Ar ($\rho$)", f"{rho:.3f} kg/m³")
 
     st.write("---")
     
@@ -202,7 +181,6 @@ with col_centro:
 
     # TAB 1: CURVAS DE DESEMPENHO
     with tab_grafico:
-        # A curva agora termina logo um pouquinho à frente da velocidade atual escolhida (ex: +15 km/h ou no mínimo 40 km/h)
         v_max_grafico = max(40.0, v_kmh + 15.0)
         v_vec = np.linspace(0, v_max_grafico, 100)
         v_vec_ef = np.maximum(0.1, v_vec + v_vento_kmh) / 3.6
@@ -230,7 +208,6 @@ with col_centro:
             fig.add_shape(type="line", x0=0, y0=fd_b, x1=v_kmh, y1=fd_b,
                           line=dict(color="#FF2A6D", width=1.5, dash="dash"))
 
-        # Ajusta os limites do eixo X dinamicamente para acompanhar a curva terminando logo à frente do ponto
         fig.update_layout(
             xaxis=dict(range=[0, v_max_grafico], title="Velocidade (km/h)"),
             yaxis=dict(title="Força de Arrasto (N)"),
