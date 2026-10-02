@@ -32,26 +32,28 @@ st.markdown(
 )
 
 st.markdown(
-    '<div class="main-title">Simulador de Força de Arrasto (Velocidade Linear)</div>',
+    '<div class="main-title">Simulador de Força de Arrasto (Geometrias em Regime Linear)</div>',
     unsafe_allow_html=True,
 )
 st.markdown(
-    '<div class="subtitle">Análise de resistência em regime linear proporcional ($F_d \\propto v$)</div>',
+    '<div class="subtitle">Análise comparativa de resistência viscosa linear ($F_d = k \\cdot \\rho \\cdot v$)</div>',
     unsafe_allow_html=True,
 )
 
-# --- PRESETS DE OBJETOS ---
-PRESETS_AR = {
-    "Carro Esportivo": {"k": 0.45, "desc": "Perfil aerodinâmico otimizado"},
-    "Caminhão / Ônibus": {
-        "k": 1.20,
-        "desc": "Grande seção frontal e formato romptivo",
+# --- PRESETS DE FORMAS GEOMETRICAS ---
+PRESETS_FORMAS = {
+    "Esfera": {
+        "k": 0.50,
+        "desc": "Simetria tridimensional e escoamento uniforme",
     },
-}
-
-PRESETS_AGUA = {
-    "Lancha Rápida": {"k": 3.50, "desc": "Hidrodinâmica de superfície"},
-    "Submarino": {"k": 0.80, "desc": "Corpo esguio de imersão"},
+    "Bloco / Cubo": {
+        "k": 1.50,
+        "desc": "Arestas abruptas e alta retenção de fluxo",
+    },
+    "Prisma / Triângulo": {
+        "k": 0.90,
+        "desc": "Perfil direcional de cunha",
+    },
 }
 
 # --- BARRA LATERAL (AMPLITUDE E AMBIENTE) ---
@@ -63,17 +65,12 @@ if fluido == "Ar":
         "Altitude (m):", 0, 10000, 0, 500, help="Afeta a densidade do ar."
     )
     temperatura = st.sidebar.slider("Temperatura do Ar (°C):", -20, 40, 20, 1)
-    # Cálculo aproximado da densidade do ar
     pressao = 101325 * np.exp(-altitude / 8500)
     temp_k = temperatura + 273.15
     rho = pressao / (287.05 * temp_k)
-    presets_atuais = PRESETS_AR
 else:
     temperatura = st.sidebar.slider("Temperatura da Água (°C):", 0, 30, 20, 1)
-    rho = 1000 - 0.02 * (
-        temperatura - 4
-    ) ** 2  # Variação térmica aproximada da água
-    presets_atuais = PRESETS_AGUA
+    rho = 1000 - 0.02 * (temperatura - 4) ** 2
 
 st.sidebar.markdown(f"**Densidade do Fluido ($\\rho$):** `{rho:.3f} kg/m³`")
 
@@ -81,20 +78,20 @@ st.sidebar.markdown(f"**Densidade do Fluido ($\\rho$):** `{rho:.3f} kg/m³`")
 col_config1, col_config2 = st.columns(2)
 
 with col_config1:
-    st.subheader("🚗 Configuração do Objeto A")
+    st.subheader("🔵 Objeto A (Geometria Base)")
     preset_a = st.selectbox(
-        "Modelo Base (Objeto A):", list(presets_atuais.keys()), key="preset_a"
+        "Forma Geométrica A:", list(PRESETS_FORMAS.keys()), key="preset_a"
     )
 
-    k_default = presets_atuais[preset_a]["k"]
+    k_default_a = PRESETS_FORMAS[preset_a]["k"]
 
     k_a = st.slider(
-        "Coeficiente de Arrasto Linear ($k$):",
+        "Coeficiente Linear ($k_A$):",
         0.01,
-        10.0,
-        float(k_default),
+        5.0,
+        float(k_default_a),
         0.05,
-        help="Fator de proporcionalidade linear da força de resistência.",
+        help="Fator de resistência geométrica linear.",
     )
 
     vel_a = st.slider(
@@ -102,18 +99,21 @@ with col_config1:
     )
 
 with col_config2:
-    st.subheader("📊 Modo Comparativo (Objeto B)")
-    comparar = st.checkbox("Ativar Comparação com Objeto B")
+    st.subheader("📊 Objeto B (Modo Comparativo)")
+    comparar = st.checkbox("Ativar Comparação entre Formas")
 
     if comparar:
         preset_b = st.selectbox(
-            "Modelo Base (Objeto B):",
-            list(presets_atuais.keys()),
-            key="preset_b",
+            "Forma Geométrica B:", list(PRESETS_FORMAS.keys()), key="preset_b"
         )
-        k_b_default = presets_atuais[preset_b]["k"] * 1.5
+        k_default_b = PRESETS_FORMAS[preset_b]["k"]
+
         k_b = st.slider(
-            "Coeficiente Linear Objeto B ($k$):", 0.01, 10.0, float(k_b_default)
+            "Coeficiente Linear ($k_B$):",
+            0.01,
+            5.0,
+            float(k_default_b),
+            0.05,
         )
         vel_b = st.slider(
             "Velocidade do Objeto B (km/h):", 0.0, 200.0, 50.0, 1.0, key="vel_b"
@@ -127,22 +127,19 @@ f_d_a = k_a * rho * v_a_ms
 st.markdown("---")
 col_met1, col_met2 = st.columns(2)
 with col_met1:
-    st.metric(
-        label=f"Força de Arrasto (Objeto A - {preset_a})",
-        value=f"{f_d_a:.2f} N",
-    )
+    st.metric(label=f"Força de Arrasto (Objeto A: {preset_a})", value=f"{f_d_a:.2f} N")
 
 if comparar:
     v_b_ms = vel_b / 3.6
     f_d_b = k_b * rho * v_b_ms
     with col_met2:
         st.metric(
-            label=f"Força de Arrasto (Objeto B - {preset_b})",
+            label=f"Força de Arrasto (Objeto B: {preset_b})",
             value=f"{f_d_b:.2f} N",
         )
 
 # --- GRÁFICO DINÂMICO (LINHA RETA / PROPORCIONALIDADE) ---
-st.markdown("### 📈 Curva de Comportamento Linear da Força de Arrasto")
+st.markdown("### 📈 Curva Comparativa de Arrasto Linear")
 
 velocidades_range = np.linspace(0, 200, 100)
 velocidades_ms = velocidades_range / 3.6
@@ -194,7 +191,7 @@ if comparar:
     )
 
 fig.update_layout(
-    title="Relação Linear entre Velocidade e Força de Resistência ($F_d = k \\cdot \\rho \\cdot v$)",
+    title="Relação Linear Proporcional ($F_d = k \\cdot \\rho \\cdot v$)",
     xaxis_title="Velocidade (km/h)",
     yaxis_title="Força de Arrasto (N)",
     template="plotly_white",
