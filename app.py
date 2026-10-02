@@ -2,10 +2,10 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
-# Configuração da Página
+# Configuração da Página (DEVE SER SEMPRE A PRIMEIRA CHAMADA DO STREAMLIT)
 st.set_page_config(
     page_title="Simulador de Força de Arrasto Linear",
-    page_layout="wide",
+    layout="wide",
     initial_sidebar_state="expanded",
 )
 
@@ -36,7 +36,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(
-    '<div class="subtitle">Análise de resistência em regime linear proporcional ($F_d \propto v$)</div>',
+    '<div class="subtitle">Análise de resistência em regime linear proporcional ($F_d \\propto v$)</div>',
     unsafe_allow_html=True,
 )
 
@@ -68,14 +68,12 @@ if fluido == "Ar":
     temp_k = temperatura + 273.15
     rho = pressao / (287.05 * temp_k)
     presets_atuais = PRESETS_AR
-    unidade_k = "N·s/m"
 else:
     temperatura = st.sidebar.slider("Temperatura da Água (°C):", 0, 30, 20, 1)
     rho = 1000 - 0.02 * (
         temperatura - 4
     ) ** 2  # Variação térmica aproximada da água
     presets_atuais = PRESETS_AGUA
-    unidade_k = "N·s/m"
 
 st.sidebar.markdown(f"**Densidade do Fluido ($\\rho$):** `{rho:.3f} kg/m³`")
 
@@ -88,7 +86,6 @@ with col_config1:
         "Modelo Base (Objeto A):", list(presets_atuais.keys()), key="preset_a"
     )
 
-    # Valores padrão baseados no preset escolhido
     k_default = presets_atuais[preset_a]["k"]
 
     k_a = st.slider(
@@ -114,9 +111,7 @@ with col_config2:
             list(presets_atuais.keys()),
             key="preset_b",
         )
-        k_b_default = (
-            presets_atuais[preset_b]["k"] * 1.5
-        )  # Um valor diferente para comparar
+        k_b_default = presets_atuais[preset_b]["k"] * 1.5
         k_b = st.slider(
             "Coeficiente Linear Objeto B ($k$):", 0.01, 10.0, float(k_b_default)
         )
@@ -125,9 +120,8 @@ with col_config2:
         )
 
 # --- MOTOR DE CÁLCULO FÍSICO (VELOCIDADE LINEAR) ---
-# Fórmula: F_d = k * v (onde v está em m/s)
 v_a_ms = vel_a / 3.6
-f_d_a = k_a * rho * v_a_ms  # Incorporando rho na proporcionalidade ou direto k*v
+f_d_a = k_a * rho * v_a_ms
 
 # Exibição de Métricas
 st.markdown("---")
