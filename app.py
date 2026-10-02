@@ -36,7 +36,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(
-    '<div class="subtitle">Análise comparativa de resistência viscosa linear ($F_d = k \\cdot \\rho \\cdot v$)</div>',
+    '<div class="subtitle">Análise comparativa de resistência viscosa linear ($Fd = k \\ \\p \\v)</div>',
     unsafe_allow_html=True,
 )
 
