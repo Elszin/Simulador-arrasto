@@ -1,200 +1,210 @@
-import streamlit as st
-import plotly.graph_objects as go
 import numpy as np
+import plotly.graph_objects as go
+import streamlit as st
 
-# ==========================================
-# 1. CONFIGURAÇÃO DA PÁGINA
-# ==========================================
+# Configuração da Página
 st.set_page_config(
-    page_title="Simulador de Aerodinâmica e Hidrodinâmica",
-    page_icon="🌊",
-    layout="wide"
+    page_title="Simulador de Força de Arrasto Linear",
+    page_layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-st.markdown("""
+# Estilização CSS customizada
+st.markdown(
+    """
     <style>
     .main-title {
-        font-size: 2.2rem;
-        font-weight: 900;
-        background: -webkit-linear-gradient(45deg, #00D2FF, #FF2A6D);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 5px;
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #1E3A8A;
+        text-align: center;
+        margin-bottom: 0.5rem;
+    }
+    .subtitle {
+        font-size: 1.1rem;
+        color: #4B5563;
+        text-align: center;
+        margin-bottom: 2rem;
     }
     </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
-# Presets separados por fluido
+st.markdown(
+    '<div class="main-title">Simulador de Força de Arrasto (Velocidade Linear)</div>',
+    unsafe_allow_html=True,
+)
+st.markdown(
+    '<div class="subtitle">Análise de resistência em regime linear proporcional ($F_d \propto v$)</div>',
+    unsafe_allow_html=True,
+)
+
+# --- PRESETS DE OBJETOS ---
 PRESETS_AR = {
-    "Carro Esportivo (Supercarro)": {"cd": 0.28, "area": 1.9},
-    "Caminhão / Ônibus": {"cd": 0.80, "area": 8.0}
+    "Carro Esportivo": {"k": 0.45, "desc": "Perfil aerodinâmico otimizado"},
+    "Caminhão / Ônibus": {
+        "k": 1.20,
+        "desc": "Grande seção frontal e formato romptivo",
+    },
 }
 
 PRESETS_AGUA = {
-    "Lancha Rápida": {"cd": 0.45, "area": 2.5},
-    "Submarino": {"cd": 0.05, "area": 4.0}
+    "Lancha Rápida": {"k": 3.50, "desc": "Hidrodinâmica de superfície"},
+    "Submarino": {"k": 0.80, "desc": "Corpo esguio de imersão"},
 }
 
-# ==========================================
-# BARRA LATERAL: PARÂMETROS AMBIENTAIS E FLUIDO
-# ==========================================
-with st.sidebar:
-    st.markdown("### ⚙️ Configurações do Fluido")
-    st.write("---")
-    
-    tipo_fluido = st.selectbox("Escolha o Meio (Fluido):", ["Ar (Atmosfera)", "Água (Líquido)"])
-    
-    if tipo_fluido == "Ar (Atmosfera)":
-        st.markdown("**🏔️ Altitude & Atmosfera**")
-        altitude = st.slider("Altitude (m)", 0, 5000, 0, 100, key="slider_altitude")
-        temp_c = st.slider("Temperatura do Ar (°C)", -10, 50, 20, 1, key="slider_temp")
-        
-        temp_k = temp_c + 273.15
-        p_atm = 101325 * np.exp(-altitude / 8500)
-        rho = p_atm / (287.058 * temp_k)
-        presets_atuais = PRESETS_AR
-    else:
-        st.markdown("**🌊 Propriedades da Água**")
-        temp_agua_c = st.slider("Temperatura da Água (°C)", 0, 40, 20, 1, key="slider_temp_agua")
-        rho = 1000.0 - (temp_agua_c - 4)**2 / 150.0 
-        altitude = 0
-        temp_c = temp_agua_c
-        presets_atuais = PRESETS_AGUA
+# --- BARRA LATERAL (AMPLITUDE E AMBIENTE) ---
+st.sidebar.header("🌍 Parâmetros Ambientais")
+fluido = st.sidebar.selectbox("Escolha o Meio (Fluido):", ["Ar", "Água"])
 
-    st.caption(f"💡 Densidade Real ($\rho$): **{rho:.3f} kg/m³**")
-
-    st.write("---")
-    v_max_slider = 250.0 if tipo_fluido == "Ar (Atmosfera)" else 50.0
-    v_default = 110.0 if tipo_fluido == "Ar (Atmosfera)" else 15.0
-    v_kmh = st.slider("Velocidade do Objeto (km/h)", 1.0, v_max_slider, v_default, 1.0, key="slider_v_kmh")
-    v_vento_kmh = st.slider("Correnteza / Vento Frontal (km/h)", -30.0, 30.0, 0.0, 1.0, key="slider_v_vento")
-
-    st.write("---")
-    comparar = st.toggle("🔀 Modo Comparativo (Objeto B)", value=False, key="toggle_comparar")
-
-# Funções para atualizar os estados ao trocar de preset
-def carregar_preset_a():
-    sel = st.session_state.preset_select_a
-    if sel in presets_atuais:
-        p = presets_atuais[sel]
-        st.session_state.cd_a = float(p["cd"])
-        st.session_state.area_a = float(p["area"])
-
-def carregar_preset_b():
-    sel = st.session_state.preset_select_b
-    if sel in presets_atuais:
-        p = presets_atuais[sel]
-        st.session_state.cd_b = float(p["cd"])
-        st.session_state.area_b = float(p["area"])
-
-# Inicialização de estado segura
-keys_presets = list(presets_atuais.keys())
-if "cd_a" not in st.session_state or st.session_state.get("ultimo_fluido") != tipo_fluido:
-    st.session_state.cd_a = float(presets_atuais[keys_presets[0]]["cd"])
-    st.session_state.area_a = float(presets_atuais[keys_presets[0]]["area"])
-    st.session_state.cd_b = float(presets_atuais[keys_presets[1]]["cd"])
-    st.session_state.area_b = float(presets_atuais[keys_presets[1]]["area"])
-    st.session_state.ultimo_fluido = tipo_fluido
-
-# ==========================================
-# COLUNA DIREITA: AJUSTES DOS OBJETOS
-# ==========================================
-col_centro, col_direita = st.columns([2.2, 1], gap="medium")
-
-with col_direita:
-    st.markdown("### 📐 Parâmetros do Objeto")
-    
-    with st.expander("🔵 **Objeto A (Referência)**", expanded=True):
-        st.selectbox("Modelo Base:", keys_presets, key="preset_select_a", on_change=carregar_preset_a)
-        
-        cd_a = st.slider("C_d (Coef. de Arrasto):", 0.01, 1.40, st.session_state.get("cd_a", keys_presets[0]), 0.01, key="cd_a")
-        area_a = st.slider("Área Frontal (m²):", 0.2, 15.0, st.session_state.get("area_a", keys_presets[0]), 0.1, key="area_a")
-        
-        usar_aerofolio = st.checkbox("➕ Adicionar Aerofólio / Asa", key="check_asa_a") if tipo_fluido == "Ar (Atmosfera)" else False
-        if usar_aerofolio:
-            cl_a = st.slider("C_L (Downforce/Lift):", 0.1, 2.0, 0.8, 0.1, key="cl_asa_a")
-            area_asa_a = st.slider("Área da Asa (m²):", 0.1, 2.0, 0.4, 0.1, key="area_asa_a")
-            cd_induzido_asa_a = (cl_a ** 2) / (np.pi * 3.5)
-        else:
-            cl_a, area_asa_a, cd_induzido_asa_a = 0.0, 0.0, 0.0
-
-    if comparar:
-        with st.expander("🔴 **Objeto B (Comparativo)**", expanded=False):
-            st.selectbox("Modelo Base:", keys_presets, key="preset_select_b", on_change=carregar_preset_b)
-            
-            cd_b = st.slider("C_d (Coef. de Arrasto):", 0.01, 1.40, st.session_state.get("cd_b", keys_presets[1]), 0.01, key="cd_b")
-            area_b = st.slider("Área Frontal (m²):", 0.2, 15.0, st.session_state.get("area_b", keys_presets[1]), 0.1, key="area_b")
-            cl_b, area_asa_b, cd_induzido_asa_b = 0.0, 0.0, 0.0
-
-# ==========================================
-# CÁLCULOS FÍSICOS (FORÇA DE ARRASTO)
-# ==========================================
-v_efetiva_ms = max(0.0, v_kmh + v_vento_kmh) / 3.6
-
-# Objeto A
-fd_corpo_a = 0.5 * rho * (v_efetiva_ms ** 2) * cd_a * area_a
-fd_asa_a = 0.5 * rho * (v_efetiva_ms ** 2) * cd_induzido_asa_a * area_asa_a if usar_aerofolio else 0.0
-fd_a = fd_corpo_a + fd_asa_a
-
-# Objeto B (se ativo)
-if comparar:
-    fd_b = 0.5 * rho * (v_efetiva_ms ** 2) * cd_b * area_b
-
-# ==========================================
-# DASHBOARD PRINCIPAL
-# ==========================================
-with col_centro:
-    st.markdown('<p class="main-title">🌊 Simulador de Força de Arrasto (Ar & Água)</p>', unsafe_allow_html=True)
-    
-    # Exibição da Fórmula em Destaque no Topo
-    st.markdown("---")
-    st.markdown("📌 **Fórmula da Força de Arrasto ($F_d$):**")
-    st.latex(r"F_d = \frac{1}{2} \cdot \rho \cdot v^2 \cdot C_d \cdot A")
-    st.caption("Onde: $\\rho$ = Densidade do fluido | $v$ = Velocidade efetiva | $C_d$ = Coeficiente de arrasto | $A$ = Área frontal")
-    st.markdown("---")
-
-    m1, m2 = st.columns(2)
-    m1.metric("Força de Arrasto (Fd) - Objeto A", f"{fd_a:,.1f} N".replace(",", "."))
-    if comparar:
-        m2.metric("Força de Arrasto (Fd) - Objeto B", f"{fd_b:,.1f} N".replace(",", "."))
-    else:
-        m2.metric(f"Densidade do Meio ({tipo_fluido.split()[0]})", f"{rho:.3f} kg/m³")
-
-    st.write("---")
-    st.markdown("#### 📊 Curva de Desempenho do Arrasto")
-
-    # Gráfico Dinâmico Baseado na Velocidade
-    v_max_grafico = max(10.0, v_kmh + 10.0)
-    v_vec = np.linspace(0, v_max_grafico, 100)
-    v_vec_ef = np.maximum(0.1, v_vec + v_vento_kmh) / 3.6
-    
-    fd_vec_a = (0.5 * rho * (v_vec_ef ** 2) * cd_a * area_a) + (0.5 * rho * (v_vec_ef ** 2) * cd_induzido_asa_a * area_asa_a if usar_aerofolio else 0.0)
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=v_vec, y=fd_vec_a, mode='lines', name='Objeto A', line=dict(color='#00D2FF', width=3)))
-    fig.add_trace(go.Scatter(x=[v_kmh], y=[fd_a], mode='markers', name='Ponto Atual A', marker=dict(color='#00D2FF', size=12)))
-
-    # Linhas tracejadas de projeção do Objeto A
-    fig.add_shape(type="line", x0=v_kmh, y0=0, x1=v_kmh, y1=fd_a,
-                  line=dict(color="#00D2FF", width=1.5, dash="dash"))
-    fig.add_shape(type="line", x0=0, y0=fd_a, x1=v_kmh, y1=fd_a,
-                  line=dict(color="#00D2FF", width=1.5, dash="dash"))
-
-    if comparar:
-        fd_vec_b = 0.5 * rho * (v_vec_ef ** 2) * cd_b * area_b
-        fig.add_trace(go.Scatter(x=v_vec, y=fd_vec_b, mode='lines', name='Objeto B', line=dict(color='#FF2A6D', width=3)))
-        fig.add_trace(go.Scatter(x=[v_kmh], y=[fd_b], mode='markers', name='Ponto Atual B', marker=dict(color='#FF2A6D', size=12)))
-
-        # Linhas tracejadas de projeção do Objeto B
-        fig.add_shape(type="line", x0=v_kmh, y0=0, x1=v_kmh, y1=fd_b,
-                      line=dict(color="#FF2A6D", width=1.5, dash="dash"))
-        fig.add_shape(type="line", x0=0, y0=fd_b, x1=v_kmh, y1=fd_b,
-                      line=dict(color="#FF2A6D", width=1.5, dash="dash"))
-
-    fig.update_layout(
-        xaxis=dict(range=[0, v_max_grafico], title="Velocidade (km/h)"),
-        yaxis=dict(title="Força de Arrasto (N)"),
-        template="plotly_white", 
-        height=480
+if fluido == "Ar":
+    altitude = st.sidebar.slider(
+        "Altitude (m):", 0, 10000, 0, 500, help="Afeta a densidade do ar."
     )
-    st.plotly_chart(fig, use_container_width=True)
+    temperatura = st.sidebar.slider("Temperatura do Ar (°C):", -20, 40, 20, 1)
+    # Cálculo aproximado da densidade do ar
+    pressao = 101325 * np.exp(-altitude / 8500)
+    temp_k = temperatura + 273.15
+    rho = pressao / (287.05 * temp_k)
+    presets_atuais = PRESETS_AR
+    unidade_k = "N·s/m"
+else:
+    temperatura = st.sidebar.slider("Temperatura da Água (°C):", 0, 30, 20, 1)
+    rho = 1000 - 0.02 * (
+        temperatura - 4
+    ) ** 2  # Variação térmica aproximada da água
+    presets_atuais = PRESETS_AGUA
+    unidade_k = "N·s/m"
+
+st.sidebar.markdown(f"**Densidade do Fluido ($\\rho$):** `{rho:.3f} kg/m³`")
+
+# --- PAINEL PRINCIPAL DE PARÂMETROS ---
+col_config1, col_config2 = st.columns(2)
+
+with col_config1:
+    st.subheader("🚗 Configuração do Objeto A")
+    preset_a = st.selectbox(
+        "Modelo Base (Objeto A):", list(presets_atuais.keys()), key="preset_a"
+    )
+
+    # Valores padrão baseados no preset escolhido
+    k_default = presets_atuais[preset_a]["k"]
+
+    k_a = st.slider(
+        "Coeficiente de Arrasto Linear ($k$):",
+        0.01,
+        10.0,
+        float(k_default),
+        0.05,
+        help="Fator de proporcionalidade linear da força de resistência.",
+    )
+
+    vel_a = st.slider(
+        "Velocidade do Objeto A (km/h):", 0.0, 200.0, 50.0, 1.0, key="vel_a"
+    )
+
+with col_config2:
+    st.subheader("📊 Modo Comparativo (Objeto B)")
+    comparar = st.checkbox("Ativar Comparação com Objeto B")
+
+    if comparar:
+        preset_b = st.selectbox(
+            "Modelo Base (Objeto B):",
+            list(presets_atuais.keys()),
+            key="preset_b",
+        )
+        k_b_default = (
+            presets_atuais[preset_b]["k"] * 1.5
+        )  # Um valor diferente para comparar
+        k_b = st.slider(
+            "Coeficiente Linear Objeto B ($k$):", 0.01, 10.0, float(k_b_default)
+        )
+        vel_b = st.slider(
+            "Velocidade do Objeto B (km/h):", 0.0, 200.0, 50.0, 1.0, key="vel_b"
+        )
+
+# --- MOTOR DE CÁLCULO FÍSICO (VELOCIDADE LINEAR) ---
+# Fórmula: F_d = k * v (onde v está em m/s)
+v_a_ms = vel_a / 3.6
+f_d_a = k_a * rho * v_a_ms  # Incorporando rho na proporcionalidade ou direto k*v
+
+# Exibição de Métricas
+st.markdown("---")
+col_met1, col_met2 = st.columns(2)
+with col_met1:
+    st.metric(
+        label=f"Força de Arrasto (Objeto A - {preset_a})",
+        value=f"{f_d_a:.2f} N",
+    )
+
+if comparar:
+    v_b_ms = vel_b / 3.6
+    f_d_b = k_b * rho * v_b_ms
+    with col_met2:
+        st.metric(
+            label=f"Força de Arrasto (Objeto B - {preset_b})",
+            value=f"{f_d_b:.2f} N",
+        )
+
+# --- GRÁFICO DINÂMICO (LINHA RETA / PROPORCIONALIDADE) ---
+st.markdown("### 📈 Curva de Comportamento Linear da Força de Arrasto")
+
+velocidades_range = np.linspace(0, 200, 100)
+velocidades_ms = velocidades_range / 3.6
+forcas_range_a = k_a * rho * velocidades_ms
+
+fig = go.Figure()
+
+# Curva do Objeto A
+fig.add_trace(
+    go.Scatter(
+        x=velocidades_range,
+        y=forcas_range_a,
+        mode="lines",
+        name=f"Objeto A ({preset_a})",
+        line=dict(color="#2563EB", width=3),
+    )
+)
+
+# Ponto atual do Objeto A
+fig.add_trace(
+    go.Scatter(
+        x=[vel_a],
+        y=[f_d_a],
+        mode="markers",
+        name=f"Operação Atual A ({vel_a} km/h)",
+        marker=dict(color="#1E3A8A", size=12, symbol="circle"),
+    )
+)
+
+if comparar:
+    forcas_range_b = k_b * rho * velocidades_ms
+    fig.add_trace(
+        go.Scatter(
+            x=velocidades_range,
+            y=forcas_range_b,
+            mode="lines",
+            name=f"Objeto B ({preset_b})",
+            line=dict(color="#DC2626", width=3, dash="dash"),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[vel_b],
+            y=[f_d_b],
+            mode="markers",
+            name=f"Operação Atual B ({vel_b} km/h)",
+            marker=dict(color="#991B1B", size=12, symbol="diamond"),
+        )
+    )
+
+fig.update_layout(
+    title="Relação Linear entre Velocidade e Força de Resistência ($F_d = k \\cdot \\rho \\cdot v$)",
+    xaxis_title="Velocidade (km/h)",
+    yaxis_title="Força de Arrasto (N)",
+    template="plotly_white",
+    hovermode="x unified",
+)
+
+st.plotly_chart(fig, use_container_width=True)
